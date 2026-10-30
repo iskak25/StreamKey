@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/errors";
 import { canAccessStream, canCreateStreams } from "@/lib/shared/roles";
 import { createStreamSchema } from "@/lib/validation/streams";
 import { auditCreate } from "./audit";
+import { playerConfig } from "@/lib/shared/player";
 import { appOrigin, youtubePlaybackEnabled } from "./config";
 import type { AccountContext } from "./auth/account";
 import { db } from "./firebase-admin";
@@ -123,7 +124,7 @@ export async function previewStream(acc: AccountContext, streamId: string) {
     status: s.status,
     mock: !playback,
     videoId: playback ? s.youtubeVideoId : null,
-    playerConfig: { enablejsapi: 1, playsinline: 1, autoplay: 0, controls: 0, rel: 0, origin: appOrigin() },
+    playerConfig: playerConfig(appOrigin()),
   };
 }
 

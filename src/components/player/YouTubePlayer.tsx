@@ -55,13 +55,17 @@ export default function YouTubePlayer({
   ref,
   videoId,
   vars,
+  onReady,
   onPlayingChange,
   onError,
 }: PlayerProps & { videoId: string; vars: PlayerVars }) {
   const host = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
-  const cb = useRef({ onPlayingChange, onError });
-  cb.current = { onPlayingChange, onError };
+  const cb = useRef({ onReady, onPlayingChange, onError });
+  cb.current = { onReady, onPlayingChange, onError };
+  // Latest vars without making them an effect dependency: the player must not be rebuilt by a session re-check.
+  const varsRef = useRef(vars);
+  varsRef.current = vars;
 
   useImperativeHandle<PlayerHandle, PlayerHandle>(ref, () => ({
     play: () => player.current?.playVideo(),
@@ -81,9 +85,9 @@ export default function YouTubePlayer({
           videoId,
           width: "100%",
           height: "100%",
-          playerVars: vars,
+          playerVars: varsRef.current,
           events: {
-            onReady: () => {},
+            onReady: () => cb.current.onReady?.(),
             onStateChange: (e) => cb.current.onPlayingChange(e.data === YT_PLAYING),
             onError: (e) => cb.current.onError(e.data),
           },
@@ -97,7 +101,7 @@ export default function YouTubePlayer({
       player.current = null;
       host.current?.replaceChildren();
     };
-  }, [videoId, vars]);
+  }, [videoId]);
 
   return <div ref={host} className="player-fill" />;
 }

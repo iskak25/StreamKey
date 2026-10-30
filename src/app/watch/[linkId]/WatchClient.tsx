@@ -40,6 +40,8 @@ export default function WatchClient({ linkId }: { linkId: string }) {
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [playerKey, setPlayerKey] = useState(0); // bumped only by the explicit "retry" button
 
   const player = useRef<PlayerHandle>(null);
   const phaseRef = useRef<Phase>("loading");
@@ -102,6 +104,11 @@ export default function WatchClient({ linkId }: { linkId: string }) {
     };
   }, [check, setPhaseBoth]);
 
+  // The player unmounts while offline and a fresh one is built on reconnect: it must report ready again.
+  useEffect(() => {
+    if (phase !== "ready") setPlayerReady(false);
+  }, [phase]);
+
   // Coarse activity hint (server throttles writes to once per 5 min anyway).
   useEffect(() => {
     if (phase !== "ready") return;
@@ -130,6 +137,8 @@ export default function WatchClient({ linkId }: { linkId: string }) {
   if (phase === "loading" || !access) return <p className="muted">Проверяем доступ…</p>;
 
   const showPlayer = phase === "ready";
+  const realPlayer = !access.mock && !!access.videoId;
+  const canPlay = showPlayer && (!realPlayer || (playerReady && !playerError));
 
   return (
     <>
@@ -140,11 +149,16 @@ export default function WatchClient({ linkId }: { linkId: string }) {
             <MockPlayer ref={player} onPlayingChange={setPlaying} onError={() => {}} />
           ) : (
             <YouTubePlayer
+              key={playerKey}
               ref={player}
               videoId={access.videoId}
               vars={access.playerConfig}
               onPlayingChange={setPlaying}
-              onError={(c) => setPlayerError(PLAYER_ERRORS[c] ?? PLAYER_ERRORS[5] ?? "")}
+              onReady={() => setPlayerReady(true)}
+              onError={(c) => {
+                setPlayerReady(false);
+                setPlayerError(PLAYER_ERRORS[c] ?? PLAYER_ERRORS[5] ?? "");
+              }}
             />
           ))}
         {!showPlayer && (
@@ -159,14 +173,14 @@ export default function WatchClient({ linkId }: { linkId: string }) {
         <button
           className="btn"
           type="button"
-          disabled={!showPlayer}
+          disabled={!canPlay}
           onClick={() => (playing ? player.current?.pause() : player.current?.play())}
           aria-pressed={playing}
         >
           {playing ? "Пауза" : "Play"}
         </button>
         <span className="status muted" aria-live="polite">
-          {showPlayer ? "Подключение активно" : "Нет связи с сервером"}
+          {!showPlayer ? "Нет связи с сервером" : realPlayer && !playerReady && !playerError ? "Загрузка плеера…" : "Подключение активно"}
         </span>
       </div>
 
@@ -175,6 +189,20 @@ export default function WatchClient({ linkId }: { linkId: string }) {
         <p className="notice notice-error" role="alert">
           {playerError}
         </p>
+      )}
+      {playerError && (
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={() => {
+            setPlayerError(null);
+            setPlayerReady(false);
+            setPlaying(false);
+            setPlayerKey((k) => k + 1);
+          }}
+        >
+          Повторить
+        </button>
       )}
     </>
   );

@@ -1,6 +1,7 @@
 import "server-only";
 import { Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
 import { ApiError } from "@/lib/shared/errors";
+import { playerConfig } from "@/lib/shared/player";
 import { appOrigin, sessionKey, SETTINGS, youtubePlaybackEnabled } from "../config";
 import { computeSessionId } from "../crypto/tokens";
 import { db } from "../firebase-admin";
@@ -51,7 +52,7 @@ export async function viewerAccess(linkId: string, browserSecret: string) {
     // ADR-0001: until the YouTube-policy decision is recorded the player runs in mock mode.
     mock: !playback,
     videoId: playback ? stream.youtubeVideoId : null,
-    playerConfig: { enablejsapi: 1, playsinline: 1, autoplay: 0, controls: 0, rel: 0, origin: appOrigin() },
+    playerConfig: playerConfig(appOrigin()),
     serverTime: new Date(nowMs).toISOString(),
     leaseUntil: new Date(leaseUntil).toISOString(),
   };

@@ -44,6 +44,8 @@ export default function WatchClient({ linkId }: { linkId: string }) {
   const [ended, setEnded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
+  const [muted, setMuted] = useState(true); // the muted autoplay attempt starts muted
+  const [volume, setVolume] = useState(100);
   const [playerKey, setPlayerKey] = useState(0); // bumped only by the explicit "retry" button
   const screen = useRef<HTMLElement>(null);
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
@@ -127,6 +129,7 @@ export default function WatchClient({ linkId }: { linkId: string }) {
       setPlaybackBlocked(false);
       setEnded(false);
       setPlayerError(null);
+      setMuted(true);
     }
   }, [phase]);
 
@@ -160,6 +163,9 @@ export default function WatchClient({ linkId }: { linkId: string }) {
   const showPlayer = phase === "ready";
   const realPlayer = !access.mock && !!access.videoId;
   const canPlay = showPlayer && (!realPlayer || (playerReady && !playerError));
+  // The start button disappears once playback runs; it returns only when playback is not running (e.g. autoplay refused).
+  const showStart = canPlay && !playing && !buffering;
+  const showSound = realPlayer && canPlay;
 
   return (
     <section className="watch-screen" ref={screen} aria-label="Просмотр трансляции">
@@ -172,6 +178,7 @@ export default function WatchClient({ linkId }: { linkId: string }) {
             <YouTubePlayer
               key={playerKey}
               ref={player}
+              autoStartMuted
               videoId={access.videoId}
               vars={access.playerConfig}
               onPlayingChange={(value) => {
@@ -210,15 +217,53 @@ export default function WatchClient({ linkId }: { linkId: string }) {
       </div>
 
       <div className="controls watch-controls">
-        <button
-          className="btn"
-          type="button"
-          disabled={!canPlay}
-          onClick={() => (playing ? player.current?.pause() : player.current?.play())}
-          aria-pressed={playing}
-        >
-          {playing ? "Пауза" : "Play"}
-        </button>
+        {showStart && (
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              // A click is a user gesture: start with sound.
+              player.current?.setMuted(false);
+              setMuted(false);
+              player.current?.play();
+            }}
+          >
+            Смотреть трансляцию
+          </button>
+        )}
+        {showSound && (
+          <>
+            <button
+              className="btn"
+              type="button"
+              aria-pressed={!muted}
+              onClick={() => {
+                player.current?.setMuted(!muted);
+                setMuted(!muted);
+              }}
+            >
+              {muted ? "Включить звук" : "Выключить звук"}
+            </button>
+            <input
+              className="watch-volume"
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={volume}
+              aria-label="Громкость"
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setVolume(v);
+                player.current?.setVolume(v);
+                if (v > 0 && muted) {
+                  player.current?.setMuted(false);
+                  setMuted(false);
+                }
+              }}
+            />
+          </>
+        )}
         <span className="status muted" aria-live="polite">
           {!showPlayer ? "Нет связи с сервером" : playerError ? "Ошибка плеера" : realPlayer && !playerReady ? "Загрузка плеера…" : buffering ? "Буферизация…" : playbackBlocked ? "Нажмите Play ещё раз" : ended ? "Воспроизведение завершено" : ""}
         </span>

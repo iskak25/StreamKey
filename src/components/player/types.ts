@@ -1,10 +1,15 @@
 export interface PlayerHandle {
   play(): void;
   pause(): void;
+  setMuted(muted: boolean): void;
+  /** 0-100 */
+  setVolume(volume: number): void;
 }
 
 export interface PlayerProps {
   ref?: React.Ref<PlayerHandle>;
+  /** Try a muted autoplay as soon as the player is ready (the only autoplay browsers allow). */
+  autoStartMuted?: boolean;
   /** Fired once the underlying player can accept play/pause. */
   onReady?(): void;
   onPlayingChange(playing: boolean): void;

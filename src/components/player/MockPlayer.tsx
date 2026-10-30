@@ -16,6 +16,8 @@ export default function MockPlayer({ ref, onPlayingChange }: PlayerProps) {
       setPlaying(false);
       onPlayingChange(false);
     },
+    setMuted() {},
+    setVolume() {},
   }));
 
   return (

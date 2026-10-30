@@ -6,6 +6,9 @@ import type { PlayerHandle, PlayerProps, PlayerVars } from "./types";
 interface YTPlayer {
   playVideo(): void;
   pauseVideo(): void;
+  mute(): void;
+  unMute(): void;
+  setVolume(volume: number): void;
   destroy(): void;
 }
 interface YTNamespace {
@@ -67,6 +70,7 @@ export default function YouTubePlayer({
   ref,
   videoId,
   vars,
+  autoStartMuted,
   onReady,
   onPlayingChange,
   onBufferingChange,
@@ -85,6 +89,8 @@ export default function YouTubePlayer({
   useImperativeHandle<PlayerHandle, PlayerHandle>(ref, () => ({
     play: () => player.current?.playVideo(),
     pause: () => player.current?.pauseVideo(),
+    setMuted: (muted) => (muted ? player.current?.mute() : player.current?.unMute()),
+    setVolume: (volume) => player.current?.setVolume(Math.min(100, Math.max(0, Math.round(volume)))),
   }));
 
   useEffect(() => {
@@ -107,7 +113,13 @@ export default function YouTubePlayer({
           events: {
             onReady: () => {
               clearTimeout(readyTimeout);
-              if (!cancelled) cb.current.onReady?.();
+              if (cancelled) return;
+              if (autoStartMuted) {
+                // Muted autoplay is permitted by browsers; if it is refused the visible start button remains.
+                player.current?.mute();
+                player.current?.playVideo();
+              }
+              cb.current.onReady?.();
             },
             onStateChange: (e) => {
               if (cancelled) return;

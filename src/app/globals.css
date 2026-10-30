@@ -168,3 +168,6 @@ dialog.modal::backdrop { background: rgba(10, 12, 18, .55); }
 .chip-on { background: var(--accent); color: #fff; border-color: var(--accent); }
 .chip:focus-visible { outline: 3px solid #4b8bff; }
 .watch-volume { width: 7rem; accent-color: #6aa9ff; }
+/* Owner decision: the viewer cannot hover/click the YouTube iframe, so YouTube's hover UI (title, share, pause icon) never opens.
+   Playback is driven only through our own controls. The iframe itself is not covered, cropped or restyled. */
+.watch-screen .player-box iframe { pointer-events: none; }

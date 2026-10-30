@@ -54,7 +54,7 @@ export default function WatchClient({ linkId }: { linkId: string }) {
 
   useEffect(() => {
     setFullscreenAvailable(Boolean(document.fullscreenEnabled));
-    const changed = () => setFullscreen(document.fullscreenElement === screen.current);
+    const changed = () => setFullscreen(Boolean(document.fullscreenElement)); // also true when /invite entered fullscreen
     document.addEventListener("fullscreenchange", changed);
     return () => document.removeEventListener("fullscreenchange", changed);
   }, []);
@@ -267,17 +267,16 @@ export default function WatchClient({ linkId }: { linkId: string }) {
         <span className="status muted" aria-live="polite">
           {!showPlayer ? "Нет связи с сервером" : playerError ? "Ошибка плеера" : realPlayer && !playerReady ? "Загрузка плеера…" : buffering ? "Буферизация…" : playbackBlocked ? "Нажмите Play ещё раз" : ended ? "Воспроизведение завершено" : ""}
         </span>
-        {fullscreenAvailable && (
-          <button className="btn watch-fullscreen" type="button" aria-label={fullscreen ? "Выйти из полного экрана" : "На весь экран"}
-            title={fullscreen ? "Выйти из полного экрана" : "На весь экран"}
+        {/* No exit control of our own: the button only offers a way back in after the browser's own Esc. */}
+        {fullscreenAvailable && !fullscreen && (
+          <button className="btn watch-fullscreen" type="button" aria-label="На весь экран" title="На весь экран"
             onClick={async () => {
               setFullscreenError(false);
               try {
-                if (document.fullscreenElement) await document.exitFullscreen();
-                else await screen.current?.requestFullscreen();
+                await screen.current?.requestFullscreen();
               } catch { setFullscreenError(true); }
             }}>
-            <span aria-hidden="true">{fullscreen ? "↙" : "⛶"}</span>
+            <span aria-hidden="true">⛶</span>
           </button>
         )}
       </div>

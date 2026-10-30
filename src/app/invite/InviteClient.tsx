@@ -26,6 +26,17 @@ export default function InviteClient() {
   async function start() {
     const token = tokenRef.current;
     if (!token || busy) return;
+    // Must run synchronously inside the click (user activation). The page element stays in fullscreen across the
+    // client-side navigation to /watch. Best effort: some browsers (iPhone Safari) have no element fullscreen.
+    let enteredFullscreen = false;
+    try {
+      await document.documentElement.requestFullscreen?.({ navigationUI: "hide" });
+      enteredFullscreen = Boolean(document.fullscreenElement);
+      // Chrome only: makes Esc require a press-and-hold to leave fullscreen. The browser still always allows leaving.
+      void (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } }).keyboard?.lock?.(["Escape"]).catch(() => {});
+    } catch {
+      /* not allowed: continue without fullscreen */
+    }
     setBusy(true);
     setError(null);
     try {
@@ -36,6 +47,7 @@ export default function InviteClient() {
       tokenRef.current = null;
       router.push(watchPath);
     } catch (e) {
+      if (enteredFullscreen && document.fullscreenElement) void document.exitFullscreen().catch(() => {});
       setError(messageFor(e instanceof ApiFail ? e.code : "UNKNOWN"));
       setBusy(false); // token kept: a retry with the same browser is safe and idempotent
     }

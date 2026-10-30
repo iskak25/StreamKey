@@ -1,9 +1,7 @@
 import "server-only";
 import { getApps, initializeApp, cert, applicationDefault, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { createRequire } from "node:module";
-import { join } from "node:path";
-import type { Auth } from "firebase-admin/auth";
+import { getAuth, type Auth } from "firebase-admin/auth";
 import { demoMode } from "./config";
 import { createMemoryDb } from "./dev/memory-db";
 
@@ -31,13 +29,5 @@ const app = demoMode ? null : createApp();
 
 export const db: Firestore = demoMode || !app ? (createMemoryDb() as unknown as Firestore) : getFirestore(app);
 
-/**
- * Never touched in demo mode: every caller is guarded by `demoMode`. Loaded through a runtime-only require because
- * importing firebase-admin/auth crashes on Vercel's Node (jwks-rsa -> ESM-only jose) and the bundler hoists imports.
- */
-export const adminAuth: Auth = demoMode || !app ? (null as unknown as Auth) : loadAuth(app);
-
-function loadAuth(a: App): Auth {
-  const mod = "firebase-admin/auth"; // variable name: keeps the bundler from resolving it statically
-  return (createRequire(join(process.cwd(), "noop.js"))(mod) as typeof import("firebase-admin/auth")).getAuth(a);
-}
+/** Never touched in demo mode: every caller is guarded by `demoMode`. */
+export const adminAuth: Auth = demoMode || !app ? (null as unknown as Auth) : getAuth(app);

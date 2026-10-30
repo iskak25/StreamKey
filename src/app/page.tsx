@@ -1,15 +1,6 @@
-import { connection } from "next/server";
-import Logo from "@/components/Logo";
+import { redirect } from "next/navigation";
 
-export default async function Home() {
-  await connection(); // dynamic: the CSP nonce is applied per request
-  return (
-    <main className="page">
-      <Logo width={260} plate />
-      <p>Индивидуальные приглашения для просмотра YouTube Live.</p>
-      <p className="muted">
-        Ссылка ограничивает доступ к странице. YouTube Unlisted не защищает исходное видео от копирования и пересылки.
-      </p>
-    </main>
-  );
+// The cabinet is the main screen. Without a session the (account) layout sends the visitor on to /login.
+export default function Home() {
+  redirect("/dashboard");
 }

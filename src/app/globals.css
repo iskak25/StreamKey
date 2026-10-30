@@ -120,3 +120,26 @@ h2 { margin: 0 0 .5rem; font-size: 1.25rem; }
 .logo-plate { display: inline-block; background: #fff; border-radius: 14px; padding: .25rem .75rem; margin-bottom: 1.25rem; }
 .logo-plate img, .topbar img { display: block; height: auto; }
 .topbar a { display: flex; align-items: center; }
+
+/* ---------- Links table ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.table th { text-align: left; font-weight: 600; color: var(--muted); font-size: .8rem; white-space: nowrap; }
+.table th, .table td { padding: .5rem .75rem; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.table tr:last-child td { border-bottom: 0; }
+.table .nowrap { white-space: nowrap; }
+.btn-sm { min-height: 34px; padding: 0 .9rem; font-size: .85rem; }
+@media (pointer: coarse) { .btn-sm { min-height: 44px; } }
+
+/* ---------- Modal (native <dialog>) ---------- */
+dialog.modal {
+  border: 0; border-radius: 16px; padding: 1.5rem;
+  width: min(520px, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); overflow-y: auto;
+  background: #fff; color: #1c1d21;
+}
+dialog.modal::backdrop { background: rgba(10, 12, 18, .55); }
+.share-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; }
+.share-grid .btn { display: flex; align-items: center; justify-content: center; text-decoration: none; }
+@media (max-width: 600px) {
+  dialog.modal { width: 100%; max-width: none; margin: auto 0 0; border-radius: 16px 16px 0 0; }
+}

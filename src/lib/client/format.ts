@@ -33,3 +33,8 @@ export const LINK_STATUS: Record<string, { label: string; cls: string }> = {
   REVOKED: { label: "Отозвана", cls: "pill pill-danger" },
   EXPIRED: { label: "Истекла", cls: "pill" },
 };
+
+const shortFmt = new Intl.DateTimeFormat("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+/** Compact date for table cells, e.g. 30.10.26, 23:09. */
+export const formatShort = (iso: string | null | undefined): string => (iso ? shortFmt.format(new Date(iso)) : "—");

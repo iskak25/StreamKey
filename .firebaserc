@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "streamkey-dev",
+    "dev": "streamkey-dev"
+  }
+}

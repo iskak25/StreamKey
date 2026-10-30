@@ -46,6 +46,7 @@ export default function WatchClient({ linkId }: { linkId: string }) {
   const [playerReady, setPlayerReady] = useState(false);
   const [muted, setMuted] = useState(true); // the muted autoplay attempt starts muted
   const [volume, setVolume] = useState(100);
+  const [closed, setClosed] = useState(false); // viewer closed the player; access itself is untouched
   const [playerKey, setPlayerKey] = useState(0); // bumped only by the explicit "retry" button
   const screen = useRef<HTMLElement>(null);
   const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
@@ -160,6 +161,18 @@ export default function WatchClient({ linkId }: { linkId: string }) {
 
   if (phase === "loading" || !access) return <p className="muted" role="status">{phase === "reconnecting" ? "Нет связи с сервером. Повторяем подключение…" : "Проверяем доступ…"}</p>;
 
+  if (closed) {
+    return (
+      <div className="card page-narrow">
+        <h1>Просмотр закрыт</h1>
+        <p className="muted">Доступ сохранён за этим браузером. Можно продолжить просмотр.</p>
+        <button className="btn" type="button" onClick={() => setClosed(false)}>
+          Продолжить просмотр
+        </button>
+      </div>
+    );
+  }
+
   const showPlayer = phase === "ready";
   const realPlayer = !access.mock && !!access.videoId;
   const canPlay = showPlayer && (!realPlayer || (playerReady && !playerError));
@@ -229,6 +242,24 @@ export default function WatchClient({ linkId }: { linkId: string }) {
             }}
           >
             Смотреть трансляцию
+          </button>
+        )}
+        {canPlay && playing && (
+          <button className="btn" type="button" onClick={() => player.current?.pause()}>
+            Пауза
+          </button>
+        )}
+        {canPlay && (
+          <button
+            className="btn"
+            type="button"
+            onClick={() => {
+              player.current?.pause();
+              if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
+              setClosed(true); // unmounts the player, which stops playback
+            }}
+          >
+            Закрыть
           </button>
         )}
         {showSound && (

@@ -78,6 +78,7 @@ export async function requireAccountByCookie(cookie: string | undefined): Promis
 
 /** Verifies the Google ID token and returns a session cookie value + the stored user. */
 export async function createAccountSession(idToken: string, requestId: string): Promise<{ cookie: string; user: UserDoc }> {
+  if (demoMode) throw new ApiError("FORBIDDEN", "Вход отключён в демо-режиме");
   let decoded;
   try {
     decoded = await adminAuth.verifyIdToken(idToken, true);

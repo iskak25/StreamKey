@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError, type ZodType } from "zod";
 import { ApiError, errorBody } from "@/lib/shared/errors";
-import { appOrigin, csrfSecret, SETTINGS } from "./config";
+import { appOrigin, csrfSecret, demoMode, SETTINGS } from "./config";
 import { makeCsrfToken, verifyCsrf } from "./csrf";
 
 export const COOKIE = { account: "__Host-account", viewer: "__Host-viewer", csrf: "__Host-csrf" } as const;
@@ -34,7 +34,16 @@ export function csrfResponse(extra: Record<string, unknown> = {}): NextResponse 
 }
 
 function assertSameOrigin(req: NextRequest): void {
-  if (req.headers.get("origin") !== appOrigin()) throw new ApiError("FORBIDDEN", "Недопустимый источник запроса");
+  const allowed = [appOrigin()];
+  // Demo mode without APP_ORIGIN: trust the host this very request was served on (never a client-chosen one:
+  // Origin must still equal it exactly).
+  if (demoMode && !process.env.APP_ORIGIN) {
+    const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+    const proto = req.headers.get("x-forwarded-proto") ?? req.nextUrl.protocol.replace(":", "");
+    if (host) allowed.push(`${proto}://${host}`);
+  }
+  const origin = req.headers.get("origin");
+  if (!origin || !allowed.includes(origin)) throw new ApiError("FORBIDDEN", "Недопустимый источник запроса");
 }
 
 function assertCsrf(req: NextRequest): void {

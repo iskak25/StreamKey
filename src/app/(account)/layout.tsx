@@ -23,7 +23,10 @@ export default async function AccountLayout({ children }: { children: ReactNode 
         </div>
       </header>
       {demoMode && (
-        <p className="banner">Демо-режим: вход отключён, данные хранятся в памяти сервера и пропадут при его перезапуске.</p>
+        <p className="banner">
+          Демо-режим: вход отключён, кабинет открыт, данные хранятся в памяти сервера. Они пропадают при перезапуске и могут не сохраняться между
+          запросами на Vercel.
+        </p>
       )}
       <main className="page">{children}</main>
     </div>

@@ -1,13 +1,15 @@
 import "server-only";
 import { getApps, initializeApp, cert, applicationDefault, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
+import { getAuth, type Auth } from "firebase-admin/auth";
+import { demoMode } from "./config";
 import { createMemoryDb } from "./dev/memory-db";
+
+export { demoMode };
 
 /**
  * Единая инициализация Admin SDK. Только серверный код.
- * В эмуляторе достаточно FIRESTORE_EMULATOR_HOST / FIREBASE_AUTH_EMULATOR_HOST.
- * В Vercel ключ сервисного аккаунта передаётся через секреты окружения.
+ * В демо-режиме (ADR-0002) Firebase не инициализируется вообще: данные в памяти, входа нет.
  */
 function createApp(): App {
   const existing = getApps()[0];
@@ -23,14 +25,9 @@ function createApp(): App {
   return initializeApp({ credential: applicationDefault(), projectId });
 }
 
-// DEMO_MODE swaps Firestore for an in-memory store and skips sign-in. It must never reach production.
-if (process.env.DEMO_MODE === "true" && process.env.NODE_ENV === "production") {
-  throw new Error("DEMO_MODE must not be enabled in production");
-}
-export const demoMode = process.env.DEMO_MODE === "true" && process.env.NODE_ENV !== "production";
+const app = demoMode ? null : createApp();
 
-const app = createApp();
+export const db: Firestore = demoMode || !app ? (createMemoryDb() as unknown as Firestore) : getFirestore(app);
 
-export const db: Firestore = demoMode ? (createMemoryDb() as unknown as Firestore) : getFirestore(app);
-
-export const adminAuth = getAuth(app);
+/** Never touched in demo mode: every caller is guarded by `demoMode`. */
+export const adminAuth: Auth = demoMode || !app ? (null as unknown as Auth) : getAuth(app);

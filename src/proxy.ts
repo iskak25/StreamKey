@@ -16,12 +16,16 @@ export function proxy(request: NextRequest) {
     ? ["https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://www.googleapis.com"]
     : [];
   const authScripts = isLogin ? ["https://apis.google.com"] : [];
+  // Google's sign-in helper injects an inline style (reported by the browser with this exact hash). Allowed by hash, not by
+  // 'unsafe-inline', and style ATTRIBUTES (its hidden iframe) are allowed on the login page only.
+  const loginStyleHash = "'sha256-zlqnbDt84zf1iSefLU/ImC54isoprH/MRiVZGskwexk='";
 
   const csp = [
     "default-src 'self'",
     // Official IFrame API only; 'strict-dynamic' lets our nonced script load its helpers.
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.youtube.com ${authScripts.join(" ")}${isDev ? " 'unsafe-eval'" : ""}`,
-    `style-src 'self' 'nonce-${nonce}'`,
+    `style-src 'self' 'nonce-${nonce}'${isLogin ? ` ${loginStyleHash}` : ""}`,
+    ...(isLogin ? ["style-src-attr 'unsafe-inline'"] : []),
     "img-src 'self' data: https://i.ytimg.com",
     `frame-src https://www.youtube.com https://www.youtube-nocookie.com ${authFrames.join(" ")}`,
     `connect-src 'self' ${authConnect.join(" ")}`,

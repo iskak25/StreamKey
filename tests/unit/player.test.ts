@@ -80,6 +80,31 @@ describe("YouTube API adapter", () => {
     expect(instance.setVolume).toHaveBeenCalledWith(100);
   });
 
+  it("tries sound first and falls back to muted when the browser blocks autoplay", async () => {
+    type Events = { onReady(): void; onStateChange(e: { data: number }): void; onAutoplayBlocked(): void };
+    let events!: Events;
+    const instance = { playVideo: vi.fn(), pauseVideo: vi.fn(), mute: vi.fn(), unMute: vi.fn(), setVolume: vi.fn(), destroy: vi.fn() };
+    vi.stubGlobal("window", { YT: { Player: function (_el: unknown, opts: { events: Events }) {
+      events = opts.events;
+      return instance;
+    } } });
+    const { default: Player } = await import("@/components/player/YouTubePlayer");
+    const onSoundRefused = vi.fn();
+    Player({ ref: { current: null }, videoId: "testVideo01", vars: playerConfig("https://example.com"), autoStartMuted: true, autoStartWithSound: true, onSoundRefused, onPlayingChange: vi.fn(), onError: vi.fn() });
+    cleanup = hooks.effects[0]!();
+    await Promise.resolve();
+    await Promise.resolve();
+    events.onReady();
+    expect(instance.unMute).toHaveBeenCalledOnce();
+    expect(instance.mute).not.toHaveBeenCalled();
+    events.onAutoplayBlocked();
+    expect(instance.mute).toHaveBeenCalledOnce();
+    expect(onSoundRefused).toHaveBeenCalledOnce();
+    // A slow start with sound is not a refusal.
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(onSoundRefused).toHaveBeenCalledOnce();
+  });
+
   it("reports buffering, playback blocks, end and errors; ignores events after unmount", async () => {
     type Events = { onReady(): void; onStateChange(e: { data: number }): void; onError(e: { data: number }): void; onAutoplayBlocked(): void };
     let events!: Events;

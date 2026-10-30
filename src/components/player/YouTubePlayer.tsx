@@ -99,6 +99,16 @@ export default function YouTubePlayer({
     let cancelled = false;
     let started = false;
     let soundTimer: ReturnType<typeof setTimeout> | undefined;
+    let soundTrying = false;
+    // The browser refused sound autoplay: restart muted so the viewer still sees the stream at once.
+    const fallbackMuted = () => {
+      if (cancelled || started || !soundTrying) return;
+      soundTrying = false;
+      clearTimeout(soundTimer);
+      player.current?.mute();
+      player.current?.playVideo();
+      cb.current.onSoundRefused?.();
+    };
     const readyTimeout = setTimeout(() => {
       if (!cancelled) cb.current.onError(0);
     }, 30_000);
@@ -121,14 +131,12 @@ export default function YouTubePlayer({
               if (autoStartMuted) {
                 if (autoStartWithSound) {
                   // The viewer just clicked "start": try with sound, and fall back to muted autoplay if the browser refuses.
+                  soundTrying = true;
                   player.current?.unMute();
                   player.current?.playVideo();
-                  soundTimer = setTimeout(() => {
-                    if (cancelled || started) return;
-                    player.current?.mute();
-                    player.current?.playVideo();
-                    cb.current.onSoundRefused?.();
-                  }, 2500);
+                  // Backstop only: the explicit onAutoplayBlocked event is the normal trigger, and a slow
+                  // start must not be mistaken for a refusal.
+                  soundTimer = setTimeout(fallbackMuted, 8000);
                 } else {
                   // Muted autoplay is permitted by browsers; if it is refused the visible start button remains.
                   player.current?.mute();
@@ -139,7 +147,10 @@ export default function YouTubePlayer({
             },
             onStateChange: (e) => {
               if (cancelled) return;
-              if (e.data === YT_PLAYING) started = true;
+              if (e.data === YT_PLAYING) {
+                started = true;
+                soundTrying = false;
+              }
               cb.current.onBufferingChange?.(e.data === 3);
               if (e.data !== 3) cb.current.onPlayingChange(e.data === YT_PLAYING);
               if (e.data === 0) cb.current.onEnded?.();
@@ -149,7 +160,9 @@ export default function YouTubePlayer({
               if (!cancelled) cb.current.onError(e.data);
             },
             onAutoplayBlocked: () => {
-              if (!cancelled) cb.current.onPlaybackBlocked?.();
+              if (cancelled) return;
+              if (soundTrying) fallbackMuted();
+              else cb.current.onPlaybackBlocked?.();
             },
           },
         });

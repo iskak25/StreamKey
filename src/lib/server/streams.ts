@@ -36,6 +36,7 @@ export function streamDto(id: string, s: StreamDoc) {
     accessStartsAt: s.accessStartsAt.toDate().toISOString(),
     accessEndsAt: s.accessEndsAt.toDate().toISOString(),
     hasIssuedLinks: s.hasIssuedLinks,
+    linksIssued: s.linksIssued ?? 0,
     version: s.version,
     createdAt: s.createdAt.toDate().toISOString(),
   };
@@ -75,6 +76,7 @@ export async function createStream(acc: AccountContext, input: z.output<typeof c
       accessEndsAt: Timestamp.fromDate(input.accessEndsAt),
       accessVersion: 0,
       hasIssuedLinks: false,
+      linksIssued: 0,
       version: 0,
       createdAt: now,
       updatedAt: now,

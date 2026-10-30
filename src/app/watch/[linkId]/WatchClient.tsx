@@ -39,9 +39,23 @@ export default function WatchClient({ linkId }: { linkId: string }) {
   const [access, setAccess] = useState<Access | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
   const [playing, setPlaying] = useState(false);
+  const [buffering, setBuffering] = useState(false);
+  const [playbackBlocked, setPlaybackBlocked] = useState(false);
+  const [ended, setEnded] = useState(false);
   const [playerError, setPlayerError] = useState<string | null>(null);
   const [playerReady, setPlayerReady] = useState(false);
   const [playerKey, setPlayerKey] = useState(0); // bumped only by the explicit "retry" button
+  const screen = useRef<HTMLElement>(null);
+  const [fullscreenAvailable, setFullscreenAvailable] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [fullscreenError, setFullscreenError] = useState(false);
+
+  useEffect(() => {
+    setFullscreenAvailable(Boolean(document.fullscreenEnabled));
+    const changed = () => setFullscreen(document.fullscreenElement === screen.current);
+    document.addEventListener("fullscreenchange", changed);
+    return () => document.removeEventListener("fullscreenchange", changed);
+  }, []);
 
   const player = useRef<PlayerHandle>(null);
   const phaseRef = useRef<Phase>("loading");
@@ -106,7 +120,14 @@ export default function WatchClient({ linkId }: { linkId: string }) {
 
   // The player unmounts while offline and a fresh one is built on reconnect: it must report ready again.
   useEffect(() => {
-    if (phase !== "ready") setPlayerReady(false);
+    if (phase !== "ready") {
+      setPlayerReady(false);
+      setPlaying(false);
+      setBuffering(false);
+      setPlaybackBlocked(false);
+      setEnded(false);
+      setPlayerError(null);
+    }
   }, [phase]);
 
   // Coarse activity hint (server throttles writes to once per 5 min anyway).
@@ -134,15 +155,15 @@ export default function WatchClient({ linkId }: { linkId: string }) {
     );
   }
 
-  if (phase === "loading" || !access) return <p className="muted">Проверяем доступ…</p>;
+  if (phase === "loading" || !access) return <p className="muted" role="status">{phase === "reconnecting" ? "Нет связи с сервером. Повторяем подключение…" : "Проверяем доступ…"}</p>;
 
   const showPlayer = phase === "ready";
   const realPlayer = !access.mock && !!access.videoId;
   const canPlay = showPlayer && (!realPlayer || (playerReady && !playerError));
 
   return (
-    <>
-      <h1>{access.title}</h1>
+    <section className="watch-screen" ref={screen} aria-label="Просмотр трансляции">
+      <div className="watch-stage">
       <div className="player-box">
         {showPlayer &&
           (access.mock || !access.videoId ? (
@@ -153,10 +174,28 @@ export default function WatchClient({ linkId }: { linkId: string }) {
               ref={player}
               videoId={access.videoId}
               vars={access.playerConfig}
-              onPlayingChange={setPlaying}
-              onReady={() => setPlayerReady(true)}
+              onPlayingChange={(value) => {
+                setPlaying(value);
+                if (value) {
+                  setPlaybackBlocked(false);
+                  setEnded(false);
+                }
+              }}
+              onEnded={() => setEnded(true)}
+              onBufferingChange={setBuffering}
+              onPlaybackBlocked={() => {
+                setPlaying(false);
+                setBuffering(false);
+                setPlaybackBlocked(true);
+              }}
+              onReady={() => {
+                setPlayerError(null);
+                setPlayerReady(true);
+              }}
               onError={(c) => {
                 setPlayerReady(false);
+                setPlaying(false);
+                setBuffering(false);
                 setPlayerError(PLAYER_ERRORS[c] ?? PLAYER_ERRORS[5] ?? "");
               }}
             />
@@ -164,12 +203,13 @@ export default function WatchClient({ linkId }: { linkId: string }) {
         {!showPlayer && (
           <div className="player-fill mock">
             <span className="mock-state">Восстановление соединения…</span>
-            <span>Просмотр продолжится автоматически, когда связь с сервером вернётся.</span>
+            <span>После восстановления связи нажмите Play для продолжения.</span>
           </div>
         )}
       </div>
+      </div>
 
-      <div className="controls">
+      <div className="controls watch-controls">
         <button
           className="btn"
           type="button"
@@ -180,11 +220,24 @@ export default function WatchClient({ linkId }: { linkId: string }) {
           {playing ? "Пауза" : "Play"}
         </button>
         <span className="status muted" aria-live="polite">
-          {!showPlayer ? "Нет связи с сервером" : realPlayer && !playerReady && !playerError ? "Загрузка плеера…" : "Подключение активно"}
+          {!showPlayer ? "Нет связи с сервером" : playerError ? "Ошибка плеера" : realPlayer && !playerReady ? "Загрузка плеера…" : buffering ? "Буферизация…" : playbackBlocked ? "Нажмите Play ещё раз" : ended ? "Воспроизведение завершено" : ""}
         </span>
+        {fullscreenAvailable && (
+          <button className="btn watch-fullscreen" type="button" aria-label={fullscreen ? "Выйти из полного экрана" : "На весь экран"}
+            title={fullscreen ? "Выйти из полного экрана" : "На весь экран"}
+            onClick={async () => {
+              setFullscreenError(false);
+              try {
+                if (document.fullscreenElement) await document.exitFullscreen();
+                else await screen.current?.requestFullscreen();
+              } catch { setFullscreenError(true); }
+            }}>
+            <span aria-hidden="true">{fullscreen ? "↙" : "⛶"}</span>
+          </button>
+        )}
       </div>
 
-      <p className="muted">После загрузки браузер может потребовать повторно нажать Play: автозапуск со звуком запрещён.</p>
+      {fullscreenError && <p className="watch-message" role="status">Браузер не разрешил полноэкранный режим.</p>}
       {playerError && (
         <p className="notice notice-error" role="alert">
           {playerError}
@@ -198,12 +251,15 @@ export default function WatchClient({ linkId }: { linkId: string }) {
             setPlayerError(null);
             setPlayerReady(false);
             setPlaying(false);
+            setBuffering(false);
+            setPlaybackBlocked(false);
+            setEnded(false);
             setPlayerKey((k) => k + 1);
           }}
         >
           Повторить
         </button>
       )}
-    </>
+    </section>
   );
 }

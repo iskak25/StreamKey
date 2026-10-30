@@ -16,7 +16,7 @@ interface YTNamespace {
       width: string;
       height: string;
       playerVars: PlayerVars;
-      events: { onReady(): void; onStateChange(e: { data: number }): void; onError(e: { data: number }): void };
+      events: { onReady(): void; onStateChange(e: { data: number }): void; onError(e: { data: number }): void; onAutoplayBlocked(): void };
     },
   ) => YTPlayer;
 }
@@ -34,16 +34,28 @@ function loadIframeApi(): Promise<YTNamespace> {
   if (window.YT?.Player) return Promise.resolve(window.YT);
   apiPromise ??= new Promise<YTNamespace>((resolve, reject) => {
     const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      if (window.YT) resolve(window.YT);
-    };
     const s = document.createElement("script");
-    s.src = "https://www.youtube.com/iframe_api";
-    s.onerror = () => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      s.onerror = null;
+      if (window.onYouTubeIframeAPIReady === ready) window.onYouTubeIframeAPIReady = prev;
+    };
+    const fail = () => {
+      cleanup();
+      s.remove();
       apiPromise = null;
       reject(new Error("iframe_api"));
     };
+    const ready = () => {
+      if (!window.YT?.Player) return;
+      cleanup();
+      resolve(window.YT);
+      prev?.();
+    };
+    const timeout = setTimeout(fail, 20_000);
+    window.onYouTubeIframeAPIReady = ready;
+    s.src = "https://www.youtube.com/iframe_api";
+    s.onerror = fail;
     document.head.appendChild(s);
   });
   return apiPromise;
@@ -57,12 +69,15 @@ export default function YouTubePlayer({
   vars,
   onReady,
   onPlayingChange,
+  onBufferingChange,
+  onPlaybackBlocked,
+  onEnded,
   onError,
 }: PlayerProps & { videoId: string; vars: PlayerVars }) {
   const host = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
-  const cb = useRef({ onReady, onPlayingChange, onError });
-  cb.current = { onReady, onPlayingChange, onError };
+  const cb = useRef({ onReady, onPlayingChange, onError, onBufferingChange, onPlaybackBlocked, onEnded });
+  cb.current = { onReady, onPlayingChange, onError, onBufferingChange, onPlaybackBlocked, onEnded };
   // Latest vars without making them an effect dependency: the player must not be rebuilt by a session re-check.
   const varsRef = useRef(vars);
   varsRef.current = vars;
@@ -74,6 +89,9 @@ export default function YouTubePlayer({
 
   useEffect(() => {
     let cancelled = false;
+    const readyTimeout = setTimeout(() => {
+      if (!cancelled) cb.current.onError(0);
+    }, 30_000);
     // The API replaces this node with the iframe, so give it a throwaway child.
     const mount = document.createElement("div");
     host.current?.appendChild(mount);
@@ -87,16 +105,34 @@ export default function YouTubePlayer({
           height: "100%",
           playerVars: varsRef.current,
           events: {
-            onReady: () => cb.current.onReady?.(),
-            onStateChange: (e) => cb.current.onPlayingChange(e.data === YT_PLAYING),
-            onError: (e) => cb.current.onError(e.data),
+            onReady: () => {
+              clearTimeout(readyTimeout);
+              if (!cancelled) cb.current.onReady?.();
+            },
+            onStateChange: (e) => {
+              if (cancelled) return;
+              cb.current.onBufferingChange?.(e.data === 3);
+              if (e.data !== 3) cb.current.onPlayingChange(e.data === YT_PLAYING);
+              if (e.data === 0) cb.current.onEnded?.();
+            },
+            onError: (e) => {
+              clearTimeout(readyTimeout);
+              if (!cancelled) cb.current.onError(e.data);
+            },
+            onAutoplayBlocked: () => {
+              if (!cancelled) cb.current.onPlaybackBlocked?.();
+            },
           },
         });
       })
-      .catch(() => cb.current.onError(0));
+      .catch(() => {
+        clearTimeout(readyTimeout);
+        if (!cancelled) cb.current.onError(0);
+      });
 
     return () => {
       cancelled = true;
+      clearTimeout(readyTimeout);
       player.current?.destroy();
       player.current = null;
       host.current?.replaceChildren();

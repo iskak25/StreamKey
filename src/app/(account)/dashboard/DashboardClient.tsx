@@ -13,6 +13,7 @@ interface StreamItem {
   accessStartsAt: string;
   accessEndsAt: string;
   hasIssuedLinks: boolean;
+  linksIssued: number;
 }
 interface Me {
   limits: { maxActiveStreams: number; maxLinksLifetime: number };
@@ -132,7 +133,7 @@ export default function DashboardClient() {
                     <span className={st.cls}>{st.label}</span>
                   </div>
                   <p className="muted">
-                    {formatDate(s.accessStartsAt)} — {formatDate(s.accessEndsAt)}
+                    {formatDate(s.accessStartsAt)} — {formatDate(s.accessEndsAt)} · Ключей: {s.linksIssued}
                   </p>
                 </Link>
               </li>

@@ -162,7 +162,7 @@ export async function issueLink(input: IssueInput): Promise<IssueResult> {
     tx.create(linkRef, link);
     tx.create(idemRef, idem);
     tx.set(usageRef, { schemaVersion: SCHEMA_VERSION, issuedLifetime: usage.issuedLifetime + 1, activeStreams: usage.activeStreams, updatedAt: now });
-    if (!stream.hasIssuedLinks) tx.update(streamRef, { hasIssuedLinks: true, updatedAt: now });
+    tx.update(streamRef, { hasIssuedLinks: true, linksIssued: (stream.linksIssued ?? 0) + 1, updatedAt: now });
 
     if (oldRef && oldLink && oldLink.status !== "REVOKED") {
       tx.update(oldRef, { status: "REVOKED", revokedAt: now, revokeReason: input.reason ?? "replaced" });

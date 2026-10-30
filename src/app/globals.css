@@ -50,15 +50,28 @@ h2 { margin: 0 0 .5rem; font-size: 1.25rem; }
   aspect-ratio: 16 / 9;
   min-height: 200px;
   background: #000;
-  border-radius: 12px;
-  overflow: hidden;
 }
 .player-box iframe, .player-fill { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+/* Use the full viewport on narrow phones to keep 16:9 and YouTube's 200px minimum height. */
+@media (max-width: 400px) {
+  .page > .player-box { width: calc(100% + 2rem); margin-inline: -1rem; }
+}
 .mock { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .5rem; color: var(--muted); text-align: center; padding: 1rem; }
 .mock-state { font-size: 1.25rem; color: var(--text); }
 
 .controls { display: flex; align-items: center; gap: 1rem; margin-top: 1rem; flex-wrap: wrap; }
 .status { font-size: .9rem; }
+
+/* Viewer-only cinema layout. Controls occupy their own row, never cover the iframe. */
+.watch-page { min-height: 100dvh; background: #000; display: grid; place-items: center; }
+.watch-page > .card, .watch-page > p { margin: 1rem; }
+.watch-screen { width: 100%; height: 100dvh; min-height: 260px; display: flex; flex-direction: column; background: #000; }
+.watch-stage { flex: 1; min-height: 200px; container-type: size; display: grid; place-items: center; }
+.watch-stage .player-box { width: min(100cqw, calc(100cqh * 16 / 9)); min-height: 200px; margin: 0; }
+.watch-controls { flex-shrink: 0; margin: 0; padding: .25rem max(.75rem, env(safe-area-inset-right)) max(.25rem, env(safe-area-inset-bottom)) max(.75rem, env(safe-area-inset-left)); gap: .5rem; }
+.watch-controls .btn { background: transparent; color: #ddd; padding: 0 .75rem; }
+.watch-controls .watch-fullscreen { margin-left: auto; font-size: 1.5rem; }
+.watch-screen > .notice, .watch-message { margin: .25rem .75rem; }
 
 /* ---------- Organizer dashboard (light theme) ---------- */
 .light {

@@ -75,6 +75,7 @@ export const StreamDoc = z.object({
   accessEndsAt: ts,
   accessVersion: z.number().int().min(0),
   hasIssuedLinks: z.boolean(),
+  linksIssued: z.number().int().min(0).optional(), // absent on streams created before the counter existed
   version: z.number().int().min(0),
   createdAt: ts,
   updatedAt: ts,

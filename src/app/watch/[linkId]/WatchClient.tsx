@@ -173,6 +173,8 @@ export default function WatchClient({ linkId }: { linkId: string }) {
     );
   }
 
+  // The viewer's click on the invite page (same document, client-side navigation) is sticky user activation.
+  const startWithSound = typeof navigator !== "undefined" && Boolean(navigator.userActivation?.hasBeenActive);
   const showPlayer = phase === "ready";
   const realPlayer = !access.mock && !!access.videoId;
   const canPlay = showPlayer && (!realPlayer || (playerReady && !playerError));
@@ -192,6 +194,8 @@ export default function WatchClient({ linkId }: { linkId: string }) {
               key={playerKey}
               ref={player}
               autoStartMuted
+              autoStartWithSound={startWithSound}
+              onSoundRefused={() => setMuted(true)}
               videoId={access.videoId}
               vars={access.playerConfig}
               onPlayingChange={(value) => {
@@ -209,6 +213,7 @@ export default function WatchClient({ linkId }: { linkId: string }) {
                 setPlaybackBlocked(true);
               }}
               onReady={() => {
+                setMuted(!startWithSound);
                 setPlayerError(null);
                 setPlayerReady(true);
               }}

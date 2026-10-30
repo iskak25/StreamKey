@@ -10,6 +10,10 @@ export interface PlayerProps {
   ref?: React.Ref<PlayerHandle>;
   /** Try a muted autoplay as soon as the player is ready (the only autoplay browsers allow). */
   autoStartMuted?: boolean;
+  /** With autoStartMuted: first try to start WITH sound (the viewer already clicked); falls back to muted if refused. */
+  autoStartWithSound?: boolean;
+  /** Sound start was refused and playback restarted muted. */
+  onSoundRefused?(): void;
   /** Fired once the underlying player can accept play/pause. */
   onReady?(): void;
   onPlayingChange(playing: boolean): void;

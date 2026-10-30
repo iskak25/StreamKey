@@ -71,6 +71,8 @@ export default function YouTubePlayer({
   videoId,
   vars,
   autoStartMuted,
+  autoStartWithSound,
+  onSoundRefused,
   onReady,
   onPlayingChange,
   onBufferingChange,
@@ -80,8 +82,8 @@ export default function YouTubePlayer({
 }: PlayerProps & { videoId: string; vars: PlayerVars }) {
   const host = useRef<HTMLDivElement>(null);
   const player = useRef<YTPlayer | null>(null);
-  const cb = useRef({ onReady, onPlayingChange, onError, onBufferingChange, onPlaybackBlocked, onEnded });
-  cb.current = { onReady, onPlayingChange, onError, onBufferingChange, onPlaybackBlocked, onEnded };
+  const cb = useRef({ onSoundRefused, onReady, onPlayingChange, onError, onBufferingChange, onPlaybackBlocked, onEnded });
+  cb.current = { onSoundRefused, onReady, onPlayingChange, onError, onBufferingChange, onPlaybackBlocked, onEnded };
   // Latest vars without making them an effect dependency: the player must not be rebuilt by a session re-check.
   const varsRef = useRef(vars);
   varsRef.current = vars;
@@ -95,6 +97,8 @@ export default function YouTubePlayer({
 
   useEffect(() => {
     let cancelled = false;
+    let started = false;
+    let soundTimer: ReturnType<typeof setTimeout> | undefined;
     const readyTimeout = setTimeout(() => {
       if (!cancelled) cb.current.onError(0);
     }, 30_000);
@@ -115,14 +119,27 @@ export default function YouTubePlayer({
               clearTimeout(readyTimeout);
               if (cancelled) return;
               if (autoStartMuted) {
-                // Muted autoplay is permitted by browsers; if it is refused the visible start button remains.
-                player.current?.mute();
-                player.current?.playVideo();
+                if (autoStartWithSound) {
+                  // The viewer just clicked "start": try with sound, and fall back to muted autoplay if the browser refuses.
+                  player.current?.unMute();
+                  player.current?.playVideo();
+                  soundTimer = setTimeout(() => {
+                    if (cancelled || started) return;
+                    player.current?.mute();
+                    player.current?.playVideo();
+                    cb.current.onSoundRefused?.();
+                  }, 2500);
+                } else {
+                  // Muted autoplay is permitted by browsers; if it is refused the visible start button remains.
+                  player.current?.mute();
+                  player.current?.playVideo();
+                }
               }
               cb.current.onReady?.();
             },
             onStateChange: (e) => {
               if (cancelled) return;
+              if (e.data === YT_PLAYING) started = true;
               cb.current.onBufferingChange?.(e.data === 3);
               if (e.data !== 3) cb.current.onPlayingChange(e.data === YT_PLAYING);
               if (e.data === 0) cb.current.onEnded?.();
@@ -145,6 +162,7 @@ export default function YouTubePlayer({
     return () => {
       cancelled = true;
       clearTimeout(readyTimeout);
+      clearTimeout(soundTimer);
       player.current?.destroy();
       player.current = null;
       host.current?.replaceChildren();

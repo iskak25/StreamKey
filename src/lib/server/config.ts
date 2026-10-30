@@ -47,7 +47,9 @@ export const receiptKey = (version: number): Buffer => key32(`RECEIPT_AES_KEY_V$
 export const csrfSecret = (): Buffer => key32("CSRF_SECRET");
 
 export const activationsDisabled = (): boolean => process.env.ACTIVATIONS_DISABLED === "true";
-export const youtubePlaybackEnabled = (): boolean => process.env.YOUTUBE_PLAYBACK_ENABLED === "true";
+// Owner enabled real YouTube playback (ADR-0001). Demo mode: on unless explicitly "false"; real mode: opt-in.
+export const youtubePlaybackEnabled = (): boolean =>
+  process.env.YOUTUBE_PLAYBACK_ENABLED === "true" || (demoMode && process.env.YOUTUBE_PLAYBACK_ENABLED !== "false");
 
 /** Defaults from the spec; meant to be overridable via admin settings later. */
 export const SETTINGS = {

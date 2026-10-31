@@ -8,6 +8,7 @@ interface YTPlayer {
   pauseVideo(): void;
   mute(): void;
   unMute(): void;
+  isMuted(): boolean;
   setVolume(volume: number): void;
   destroy(): void;
 }
@@ -92,6 +93,7 @@ export default function YouTubePlayer({
     play: () => player.current?.playVideo(),
     pause: () => player.current?.pauseVideo(),
     setMuted: (muted) => (muted ? player.current?.mute() : player.current?.unMute()),
+    isMuted: () => player.current?.isMuted() ?? true,
     setVolume: (volume) => player.current?.setVolume(Math.min(100, Math.max(0, Math.round(volume)))),
   }));
 

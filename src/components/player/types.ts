@@ -4,6 +4,8 @@ export interface PlayerHandle {
   setMuted(muted: boolean): void;
   /** 0-100 */
   setVolume(volume: number): void;
+  /** Optional: whether the underlying player is currently muted. */
+  isMuted?(): boolean;
 }
 
 export interface PlayerProps {

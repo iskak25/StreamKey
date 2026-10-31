@@ -14,9 +14,17 @@ export interface ConcertCardData {
 const PHASE_CLASS: Record<ConcertPhase, string> = { soon: "pill pill-warn", live: "pill pill-ok", ended: "pill" };
 
 /** Presentational only (used by the public catalog and by the admin wizard preview). */
-export default function ConcertCard({ concert, href }: { concert: ConcertCardData; href: string | null }) {
+export default function ConcertCard({ concert, href, editHref = null }: { concert: ConcertCardData; href: string | null; editHref?: string | null }) {
   return (
     <article className="concert-card">
+      {editHref && (
+        <Link className="concert-edit" href={editHref} aria-label="Редактировать концерт" title="Редактировать">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 20h9" />
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+          </svg>
+        </Link>
+      )}
       <div className="concert-cover">
         {concert.coverUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -34,11 +42,11 @@ export default function ConcertCard({ concert, href }: { concert: ConcertCardDat
         <p className="concert-meta">{formatBishkek(concert.startsAt)}</p>
         <p className="concert-price">{formatPrice(concert.priceKgs)}</p>
         {href ? (
-          <Link className="btn link-reset" role="button" href={href}>
+          <Link className="btn btn-brand link-reset" role="button" href={href}>
             Подробнее
           </Link>
         ) : (
-          <span className="btn" aria-disabled="true">
+          <span className="btn btn-brand" aria-disabled="true">
             Подробнее
           </span>
         )}

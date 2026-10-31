@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { api, errCode, isAuthError, messageFor } from "@/lib/client/api";
 import { formatPrice } from "@/lib/shared/concerts";
 
@@ -11,6 +12,7 @@ interface Order {
   amountKgs: number;
   paid: boolean;
   claimed: boolean;
+  linkId: string | null;
 }
 
 const POLL_MS = 3000;
@@ -80,8 +82,15 @@ export default function OrderClient({ orderId }: { orderId: string }) {
       {order?.paid && order.claimed && (
         <>
           <p>Билет оплачен. Ссылка на трансляцию уже выдавалась.</p>
-          <p className="muted">Если нужна новая, получите её ниже: прежняя ссылка и привязка к браузеру перестанут работать.</p>
-          <button className="btn" type="button" onClick={claim} disabled={busy}>
+          {order.linkId && (
+            <p>
+              <Link href={`/watch/${order.linkId}`} className="btn link-reset" role="button">
+                Продолжить просмотр
+              </Link>
+            </p>
+          )}
+          <p className="muted">Просмотр продолжается в том браузере, где вы открыли ссылку. Если нужна новая ссылка (другой браузер или устройство), получите её ниже: прежняя ссылка и привязка к браузеру перестанут работать.</p>
+          <button className="btn btn-ghost" type="button" onClick={claim} disabled={busy}>
             {busy ? "Выдаём…" : "Получить новую ссылку"}
           </button>
         </>

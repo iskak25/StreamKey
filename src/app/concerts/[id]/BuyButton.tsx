@@ -1,13 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { api, errCode, isAuthError, messageFor } from "@/lib/client/api";
 
 /**
  * Signed in: straight to the payment page. Not signed in: Google sign-in first, which
  * returns here with ?buy=1 and continues to payment automatically.
  */
-export default function BuyButton({ concertId, ended, free }: { concertId: string; ended: boolean; free: boolean }) {
+export default function BuyButton({ concertId, ended, free, paidOrderId }: { concertId: string; ended: boolean; free: boolean; paidOrderId: string | null }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
@@ -33,19 +34,35 @@ export default function BuyButton({ concertId, ended, free }: { concertId: strin
   }, [concertId]);
 
   useEffect(() => {
-    if (ended) return;
+    if (ended || paidOrderId) return;
     const q = new URLSearchParams(window.location.search);
     if (q.get("buy") === "1") {
       // Drop the flag first: a failed attempt must not retry on every reload.
       window.history.replaceState(null, "", window.location.pathname);
       void buy();
     }
-  }, [buy, ended]);
+  }, [buy, ended, paidOrderId]);
+
+  if (paidOrderId) {
+    return (
+      <div className="actions">
+        {ended ? (
+          <button className="btn" type="button" disabled>
+            Концерт завершён
+          </button>
+        ) : (
+          <Link href={`/orders/${paidOrderId}`} className="btn btn-brand link-reset" role="button">
+            Смотреть
+          </Link>
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
       <div className="actions">
-        <button className="btn" type="button" onClick={buy} disabled={busy || ended}>
+        <button className="btn btn-brand" type="button" onClick={buy} disabled={busy || ended}>
           {ended ? "Концерт завершён" : busy ? "Переходим к оплате…" : free ? "Получить билет" : "Оплатить"}
         </button>
       </div>

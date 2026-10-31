@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import Logo from "@/components/Logo";
 import BuyButton from "./BuyButton";
+import { getAccountOrNull } from "@/lib/server/auth/page";
 import { getPublishedConcert } from "@/lib/server/concerts";
+import { paidOrderId } from "@/lib/server/orders";
 import { formatBishkek, formatPrice, PHASE_LABEL } from "@/lib/shared/concerts";
 
 export const metadata: Metadata = { title: "Концерт — StreamKey" };
@@ -14,6 +16,8 @@ export default async function ConcertPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const concert = await getPublishedConcert(id).catch(() => null);
   if (!concert) notFound();
+  const acc = await getAccountOrNull();
+  const paidOrder = acc ? await paidOrderId(acc.actor.uid, id).catch(() => null) : null;
 
   return (
     <div className="light">
@@ -37,8 +41,12 @@ export default async function ConcertPage({ params }: { params: Promise<{ id: st
         </p>
         {concert.description && <p className="concert-description">{concert.description}</p>}
         <p className="concert-price">{formatPrice(concert.priceKgs)}</p>
-        <BuyButton concertId={concert.id} ended={concert.phase === "ended"} free={concert.priceKgs === 0} />
-        <p className="muted">После оплаты вы сразу получите персональную ссылку на трансляцию. Ссылка открывается один раз и закрепляется за вашим браузером.</p>
+        <BuyButton concertId={concert.id} ended={concert.phase === "ended"} free={concert.priceKgs === 0} paidOrderId={paidOrder} />
+        <p className="muted">
+          {paidOrder
+            ? "Билет оплачен. Ссылка на трансляцию открывается один раз и закрепляется за вашим браузером."
+            : "После оплаты вы сразу получите персональную ссылку на трансляцию. Ссылка открывается один раз и закрепляется за вашим браузером."}
+        </p>
       </main>
     </div>
   );

@@ -44,6 +44,8 @@ export const orderDto = (id: string, o: OrderDoc) => ({
   paid: o.status === "PAID",
   /** True once a link was handed out: the UI then asks before replacing it. */
   claimed: o.claims > 0,
+  /** Public identifier of the current link (a hash, not the secret): lets the buyer resume in the browser that already activated it. */
+  linkId: o.linkId,
 });
 
 /** Marks the order paid exactly once. Idempotent: provider callbacks and the return path may both call it. */
@@ -111,6 +113,13 @@ export async function findOrderByPaymentId(paymentId: string): Promise<{ id: str
   const snap = await db.collection(COLLECTIONS.orders).where("paymentIds", "array-contains", paymentId).limit(1).get();
   const d = snap.docs[0];
   return d ? { id: d.id, order: d.data() as OrderDoc } : null;
+}
+
+/** Id of the buyer paid order for this concert, or null: the concert page then offers to watch instead of pay. */
+export async function paidOrderId(buyerUid: string, concertId: string): Promise<string | null> {
+  const id = orderIdFor(concertId, buyerUid);
+  const o = (await orderRef(id).get()).data() as OrderDoc | undefined;
+  return o?.status === "PAID" ? id : null;
 }
 
 export async function getOrder(acc: AccountContext, id: string) {

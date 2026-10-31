@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import ConcertCard from "@/components/ConcertCard";
 import Logo from "@/components/Logo";
+import { getAccountOrNull } from "@/lib/server/auth/page";
 import { listPublishedConcerts } from "@/lib/server/concerts";
 
 export const metadata: Metadata = { title: "StreamKey — концерты", description: "Онлайн-трансляции с персональным доступом" };
@@ -16,6 +17,10 @@ export default async function Home() {
   } catch {
     failed = true;
   }
+
+  // Only a convenience: the edit page and every admin API re-check the role on the server.
+  const acc = await getAccountOrNull();
+  const isAdmin = acc?.actor.status === "ACTIVE" && (acc.actor.role === "ADMIN" || acc.actor.role === "SUPER_ADMIN");
 
   return (
     <div className="light">
@@ -36,7 +41,7 @@ export default async function Home() {
         )}
         <div className="concert-grid">
           {concerts.map((c) => (
-            <ConcertCard key={c.id} concert={c} href={`/concerts/${c.id}`} />
+            <ConcertCard key={c.id} concert={c} href={`/concerts/${c.id}`} editHref={isAdmin ? `/admin/concerts/${c.id}` : null} />
           ))}
         </div>
       </main>

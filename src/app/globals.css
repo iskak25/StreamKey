@@ -26,6 +26,10 @@ h1 { margin: 0 0 1rem; font-size: 2rem; }
 h2 { margin: 0 0 .5rem; font-size: 1.25rem; }
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   min-height: 44px;
   min-width: 44px;
   padding: 0 1.5rem;
@@ -175,7 +179,7 @@ dialog.modal::backdrop { background: rgba(10, 12, 18, .55); }
 /* ---------- Concert catalog ---------- */
 .page-wide { max-width: 1100px; }
 .concert-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
-.concert-card { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.concert-card { position: relative; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .concert-cover { aspect-ratio: 16 / 9; background: var(--field); overflow: hidden; }
 .concert-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .concert-cover-empty { height: 100%; display: grid; place-items: center; font-size: 3rem; color: var(--muted); }
@@ -184,6 +188,11 @@ dialog.modal::backdrop { background: rgba(10, 12, 18, .55); }
 .concert-body h2 { margin: 0; font-size: 1.25rem; }
 .concert-body p { margin: 0; }
 .concert-body .btn { margin-top: auto; }
+/* Brand button: the gradient of the logo (cyan-blue to violet). */
+.btn-brand { background: linear-gradient(135deg, #0a9dff 0%, #2f5bff 55%, #6b4bf0 100%); color: #fff; }
+.btn-brand:hover { filter: brightness(1.06); }
+.concert-edit { position: absolute; top: .6rem; right: .6rem; width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: 999px; background: rgba(255, 255, 255, .92); color: var(--text); box-shadow: 0 1px 4px rgba(0, 0, 0, .25); }
+.concert-edit:hover { background: #fff; color: #2f5bff; }
 .concert-meta { color: var(--muted); }
 .concert-price { font-weight: 700; font-size: 1.1rem; }
 .concert-description { white-space: pre-wrap; }

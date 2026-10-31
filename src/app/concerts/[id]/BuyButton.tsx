@@ -68,7 +68,7 @@ export default function BuyButton({
       if (typeof fbCode === "string" && fbCode.startsWith("auth/")) {
         // Firebase refused the silent guest session (typically: Anonymous sign-in is off in the project).
         console.error("guest session failed:", fbCode);
-        setError("Покупка без входа сейчас недоступна. Войдите через Google или попробуйте позже.");
+        setError(`Покупка без входа сейчас недоступна. Войдите через Google или попробуйте позже. (${fbCode})`);
         lock.current = false;
         setBusy(false);
         return;

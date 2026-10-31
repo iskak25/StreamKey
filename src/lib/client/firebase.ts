@@ -1,5 +1,19 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, linkWithPopup, signInAnonymously, signInWithPopup, signOut } from "firebase/auth";
+import {
+  browserLocalPersistence,
+  browserPopupRedirectResolver,
+  browserSessionPersistence,
+  getAuth,
+  GoogleAuthProvider,
+  indexedDBLocalPersistence,
+  initializeAuth,
+  inMemoryPersistence,
+  linkWithPopup,
+  signInAnonymously,
+  signInWithPopup,
+  signOut,
+  type Auth,
+} from "firebase/auth";
 
 // Public web config (not a secret): safety comes from deny-all Rules and server-side checks.
 const config = {
@@ -9,7 +23,19 @@ const config = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const auth = () => getAuth(getApps().length ? getApp() : initializeApp(config));
+/**
+ * Initialized WITHOUT the popup resolver: the resolver loads Google's iframe and script at startup, which pages other than
+ * /login must not allow (CSP) and which in-app browsers choke on. The resolver is passed to the popup calls instead.
+ * Persistence falls back to memory when the browser blocks storage.
+ */
+function auth(): Auth {
+  const app = getApps().length ? getApp() : initializeApp(config);
+  try {
+    return initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence, inMemoryPersistence] });
+  } catch {
+    return getAuth(app); // already initialized
+  }
+}
 
 /**
  * Opens the Google popup and returns a fresh ID token. It is handed to the server once and never stored by us.
@@ -22,12 +48,12 @@ export async function googleIdToken(): Promise<string> {
   const provider = new GoogleAuthProvider();
   if (a.currentUser?.isAnonymous) {
     try {
-      return await (await linkWithPopup(a.currentUser, provider)).user.getIdToken(true);
+      return await (await linkWithPopup(a.currentUser, provider, browserPopupRedirectResolver)).user.getIdToken(true);
     } catch (e) {
       if ((e as { code?: string }).code !== "auth/credential-already-in-use") throw e;
     }
   }
-  return (await signInWithPopup(a, provider)).user.getIdToken(true);
+  return (await signInWithPopup(a, provider, browserPopupRedirectResolver)).user.getIdToken(true);
 }
 
 /** Guest session for buying a ticket without an account: an anonymous Firebase user, invisible to the viewer. */

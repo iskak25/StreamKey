@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { Timestamp } from "firebase-admin/firestore";
 import { z } from "zod";
 import { ApiError } from "@/lib/shared/errors";
@@ -67,7 +68,7 @@ async function loadConcert(id: string): Promise<StreamDoc> {
   return s;
 }
 
-export async function createConcert(acc: AccountContext, input: z.output<typeof createConcertSchema>, requestId: string) {
+async function createConcertUncached(acc: AccountContext, input: z.output<typeof createConcertSchema>, requestId: string) {
   requireAdmin(acc);
   const streamRef = db.collection(COLLECTIONS.streams).doc();
   const usageRef = db.collection(COLLECTIONS.usage).doc(acc.actor.uid);
@@ -110,7 +111,7 @@ export async function createConcert(acc: AccountContext, input: z.output<typeof 
   });
 }
 
-export async function updateConcert(acc: AccountContext, id: string, input: z.output<typeof updateConcertSchema>, requestId: string) {
+async function updateConcertUncached(acc: AccountContext, id: string, input: z.output<typeof updateConcertSchema>, requestId: string) {
   requireAdmin(acc);
   const eventId = randomUUID();
   return db.runTransaction(async (tx) => {
@@ -143,7 +144,7 @@ export async function updateConcert(acc: AccountContext, id: string, input: z.ou
   });
 }
 
-export async function setPublication(acc: AccountContext, id: string, to: Exclude<PublicationStatus, "archived">, requestId: string) {
+async function setPublicationUncached(acc: AccountContext, id: string, to: Exclude<PublicationStatus, "archived">, requestId: string) {
   requireAdmin(acc);
   const eventId = randomUUID();
   return db.runTransaction(async (tx) => {
@@ -167,7 +168,7 @@ export async function setPublication(acc: AccountContext, id: string, to: Exclud
 }
 
 /** Archive: unpublishes and closes access (the existing closeStream bumps accessVersion and keeps counters right). */
-export async function archiveConcert(acc: AccountContext, id: string, requestId: string) {
+async function archiveConcertUncached(acc: AccountContext, id: string, requestId: string) {
   requireAdmin(acc);
   await loadConcert(id);
   await closeStream(acc, id, "ARCHIVED", requestId);
@@ -201,11 +202,48 @@ export async function getAdminConcert(acc: AccountContext, id: string) {
 
 const PHASE_ORDER = { live: 0, soon: 1, ended: 2 } as const;
 
+/**
+ * Public pages are read by anonymous visitors, so the two reads below are shared across requests for CATALOG_TTL
+ * seconds instead of hitting Firestore per visit. Admin changes drop the cache at once (bustCatalog); the phase
+ * (soon / live / ended) is recomputed on every call, so it never lags behind the clock.
+ */
+const CATALOG_TTL = 30;
+const CATALOG_TAG = "catalog";
+type PublicConcert = ReturnType<typeof publicConcertDto>;
+
+/** Called after any change that the public catalog shows (create, edit, publish, archive, cover). */
+function bustCatalog(): void {
+  try {
+    revalidateTag(CATALOG_TAG, { expire: 0 });
+  } catch {
+    // Outside a Next request (scripts, tests) there is no cache to drop.
+  }
+}
+
+const withPhase = (c: PublicConcert, nowMs: number): PublicConcert => ({ ...c, phase: concertPhase(nowMs, Date.parse(c.startsAt), Date.parse(c.endsAt)) });
+
+const readPublished = unstable_cache(
+  async (): Promise<PublicConcert[]> => {
+    const snap = await db.collection(COLLECTIONS.streams).where("publicationStatus", "==", "published").limit(100).get();
+    return snap.docs.map((d) => publicConcertDto(d.id, d.data() as StreamDoc, false));
+  },
+  ["catalog-list"],
+  { revalidate: CATALOG_TTL, tags: [CATALOG_TAG] },
+);
+
+const readPublishedOne = unstable_cache(
+  async (id: string): Promise<PublicConcert | null> => {
+    const s = (await ref(id).get()).data() as StreamDoc | undefined;
+    return !s || s.publicationStatus !== "published" ? null : publicConcertDto(id, s, true);
+  },
+  ["catalog-one"],
+  { revalidate: CATALOG_TTL, tags: [CATALOG_TAG] },
+);
+
 export async function listPublishedConcerts() {
-  const snap = await db.collection(COLLECTIONS.streams).where("publicationStatus", "==", "published").limit(100).get();
   const now = Date.now();
-  return snap.docs
-    .map((d) => publicConcertDto(d.id, d.data() as StreamDoc, false, now))
+  return (await readPublished())
+    .map((c) => withPhase(c, now))
     .sort(
       (a, b) =>
         PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase] ||
@@ -214,9 +252,9 @@ export async function listPublishedConcerts() {
 }
 
 export async function getPublishedConcert(id: string) {
-  const s = (await ref(id).get()).data() as StreamDoc | undefined;
-  if (!s || s.publicationStatus !== "published") throw new ApiError("NOT_FOUND", "Не найдено");
-  return publicConcertDto(id, s, true);
+  const c = await readPublishedOne(id);
+  if (!c) throw new ApiError("NOT_FOUND", "Не найдено");
+  return withPhase(c, Date.now());
 }
 
 // ---------- covers ----------
@@ -228,7 +266,7 @@ function sniffImage(b: Buffer): "image/jpeg" | "image/png" | "image/webp" | null
   return null;
 }
 
-export async function setCover(acc: AccountContext, id: string, bytes: Buffer, requestId: string) {
+async function setCoverUncached(acc: AccountContext, id: string, bytes: Buffer, requestId: string) {
   requireAdmin(acc);
   if (bytes.length === 0 || bytes.length > MAX_COVER_BYTES) throw new ApiError("VALIDATION_ERROR", "Обложка должна быть не больше 300 КБ");
   const contentType = sniffImage(bytes); // the file signature decides, never a client-supplied header
@@ -254,3 +292,19 @@ export async function readCover(id: string, visibility: "public" | "admin"): Pro
   const c = (await db.collection(COLLECTIONS.streamCovers).doc(id).get()).data() as { contentType: string; data: Buffer } | undefined;
   return c ? { contentType: c.contentType, data: Buffer.from(c.data) } : null;
 }
+
+// ---------- catalog-visible changes drop the shared cache ----------
+
+function bustAfter<A extends unknown[], R>(fn: (...args: A) => Promise<R>) {
+  return async (...args: A): Promise<R> => {
+    const r = await fn(...args);
+    bustCatalog();
+    return r;
+  };
+}
+
+export const createConcert = bustAfter(createConcertUncached);
+export const updateConcert = bustAfter(updateConcertUncached);
+export const setPublication = bustAfter(setPublicationUncached);
+export const archiveConcert = bustAfter(archiveConcertUncached);
+export const setCover = bustAfter(setCoverUncached);

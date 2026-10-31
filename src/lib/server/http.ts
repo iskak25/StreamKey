@@ -55,6 +55,8 @@ function assertCsrf(req: NextRequest): void {
 export interface RouteOptions {
   /** Require a valid CSRF token on mutating requests (default true). */
   csrf?: boolean;
+  /** Signed server-to-server callback (payment webhook): no browser Origin or CSRF; the handler MUST verify a signature itself. */
+  serverToServer?: boolean;
 }
 
 /**
@@ -68,7 +70,7 @@ export function route<P extends Record<string, string> = Record<string, never>>(
   return async (req: NextRequest, rc: { params: Promise<P> }): Promise<NextResponse> => {
     const requestId = randomUUID();
     try {
-      if (req.method !== "GET" && req.method !== "HEAD") {
+      if (req.method !== "GET" && req.method !== "HEAD" && !opts.serverToServer) {
         assertSameOrigin(req);
         if (opts.csrf !== false) assertCsrf(req);
       }

@@ -18,7 +18,7 @@ function errorText(e: unknown): string {
   return "Не удалось войти через Google. Повторите попытку.";
 }
 
-export default function LoginClient() {
+export default function LoginClient({ next }: { next: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +30,7 @@ export default function LoginClient() {
       const idToken = await googleIdToken();
       const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
       await api("/auth/session", { method: "POST", csrf: csrfToken, body: { idToken } });
-      router.replace("/dashboard");
+      router.replace(next ?? "/dashboard");
     } catch (e) {
       setError(errorText(e));
       setBusy(false);
@@ -40,9 +40,9 @@ export default function LoginClient() {
   return (
     <div className="card">
       <Logo width={200} plate />
-      <h1>Вход для организаторов</h1>
-      <p>Войдите через Google, чтобы создавать трансляции и выдавать приглашения.</p>
-      <p className="muted">Зрителям вход не нужен: достаточно открыть присланную ссылку-приглашение.</p>
+      <h1>{next ? "Вход для покупки билета" : "Вход для организаторов"}</h1>
+      <p>{next ? "Войдите через Google, чтобы оплатить билет. После оплаты вы сразу попадёте на трансляцию." : "Войдите через Google, чтобы создавать трансляции и выдавать приглашения."}</p>
+      {!next && <p className="muted">Зрителям вход не нужен: достаточно открыть присланную ссылку-приглашение.</p>}
       <button className="btn" type="button" onClick={signIn} disabled={busy}>
         {busy ? "Входим…" : "Войти через Google"}
       </button>

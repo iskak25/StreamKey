@@ -22,6 +22,7 @@ export const COLLECTIONS = {
   authJobs: "auth_jobs",
   rateBuckets: "rate_buckets",
   streamCovers: "stream_covers",
+  orders: "orders",
 } as const;
 
 const ts = z.instanceof(Timestamp);
@@ -204,3 +205,25 @@ export type SystemSecurityDoc = z.infer<typeof SystemSecurityDoc>;
 export type AuditLogDoc = z.infer<typeof AuditLogDoc>;
 export type AuthJobDoc = z.infer<typeof AuthJobDoc>;
 
+
+export const OrderStatus = z.enum(["PENDING", "PAID", "FAILED"]);
+
+/** orders/{concertId}_{buyerUid}: one ticket per buyer per concert. */
+export interface OrderDoc {
+  schemaVersion: typeof SCHEMA_VERSION;
+  concertId: string;
+  ownerUid: string;
+  buyerUid: string;
+  amountKgs: number;
+  status: z.infer<typeof OrderStatus>;
+  provider: string;
+  providerRef: string | null;
+  /** Every payment id sent to the provider for this order (a retry creates a new one); the callback is matched by it. */
+  paymentIds: string[];
+  paidAt: Timestamp | null;
+  /** Current access link issued for this ticket, and how many times a link was issued. */
+  linkId: string | null;
+  claims: number;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}

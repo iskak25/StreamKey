@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import Logo from "@/components/Logo";
+import BuyButton from "./BuyButton";
 import { getPublishedConcert } from "@/lib/server/concerts";
 import { formatBishkek, formatPrice, PHASE_LABEL } from "@/lib/shared/concerts";
 
@@ -36,12 +37,8 @@ export default async function ConcertPage({ params }: { params: Promise<{ id: st
         </p>
         {concert.description && <p className="concert-description">{concert.description}</p>}
         <p className="concert-price">{formatPrice(concert.priceKgs)}</p>
-        <div className="actions">
-          <button className="btn" type="button" disabled>
-            Купить билет
-          </button>
-        </div>
-        <p className="muted">Онлайн-оплата скоро появится. Доступ к трансляции выдаётся персональной ссылкой после покупки.</p>
+        <BuyButton concertId={concert.id} ended={concert.phase === "ended"} free={concert.priceKgs === 0} />
+        <p className="muted">После оплаты вы сразу получите персональную ссылку на трансляцию. Ссылка открывается один раз и закрепляется за вашим браузером.</p>
       </main>
     </div>
   );

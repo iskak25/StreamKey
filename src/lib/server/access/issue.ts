@@ -37,6 +37,8 @@ export interface IssueInput {
   expiresAt: Date;
   reason?: string;
   requestId: string;
+  /** Paid-ticket fulfilment only: the buyer is already rate-limited at checkout, and the per-owner bucket would throttle sales. */
+  skipRateLimit?: boolean;
 }
 
 export interface IssueResult {
@@ -61,7 +63,7 @@ export async function issueLink(input: IssueInput): Promise<IssueResult> {
   if (!input.idempotencyKey || !UUID.test(input.idempotencyKey)) {
     throw new ApiError("VALIDATION_ERROR", "Требуется заголовок Idempotency-Key (UUID)");
   }
-  await ratelimitCreate(acc.actor.uid);
+  if (!input.skipRateLimit) await ratelimitCreate(acc.actor.uid);
 
   const idemId = sha(`${acc.actor.uid}\n${input.route}\n${input.idempotencyKey}`);
   const requestHash = sha(

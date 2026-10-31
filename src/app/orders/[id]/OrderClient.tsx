@@ -51,6 +51,23 @@ export default function OrderClient({ orderId }: { orderId: string }) {
     }
   }, [orderId, toLogin]);
 
+  /** Back to the payment page (the same pending payment is reused server-side). */
+  async function pay() {
+    if (!order || lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
+      const r = await api<{ redirectUrl: string }>(`/concerts/${order.concertId}/checkout`, { method: "POST", csrf: csrfToken, body: {} });
+      window.location.assign(r.redirectUrl);
+    } catch (e) {
+      setError(messageFor(errCode(e)));
+      lock.current = false;
+      setBusy(false);
+    }
+  }
+
   async function showCode() {
     try {
       const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
@@ -104,6 +121,11 @@ export default function OrderClient({ orderId }: { orderId: string }) {
       )}
       {!order && !error && !lostSession && <p className="muted">Проверяем оплату…</p>}
       {order && !order.paid && <p className="muted">Ожидание оплаты ({formatPrice(order.amountKgs)}). Оплатите QR-код в приложении банка: страница обновится сама, ничего нажимать не нужно.</p>}
+      {order && !order.paid && (
+        <button className="btn" type="button" onClick={pay} disabled={busy}>
+          {busy ? "Открываем оплату…" : "Перейти к оплате"}
+        </button>
+      )}
       {order?.paid && !order.claimed && !error && <p className="muted">Оплата подтверждена. Открываем трансляцию…</p>}
       {order?.paid && order.claimed && (
         <>

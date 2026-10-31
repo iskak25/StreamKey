@@ -16,6 +16,7 @@ interface StreamItem {
   linksIssued: number;
 }
 interface Me {
+  permissions: { canCreateStreams: boolean };
   limits: { maxActiveStreams: number; maxLinksLifetime: number };
   usage: { activeStreams: number; issuedLifetime: number };
 }
@@ -32,6 +33,7 @@ export default function DashboardClient() {
   const [error, setError] = useState<string | null>(null);
   const [me, setMe] = useState<Me | null>(null);
   const [filter, setFilter] = useState("ALL");
+  const canCreate = me?.permissions.canCreateStreams === true;
 
   const load = useCallback(
     async (after: string | null) => {
@@ -62,9 +64,11 @@ export default function DashboardClient() {
     <div className="stack">
       <div className="row">
         <h1>Мои трансляции</h1>
-        <Link href="/dashboard/streams/new" className="btn link-reset" role="button">
-          Новая трансляция
-        </Link>
+        {canCreate && (
+          <Link href="/dashboard/streams/new" className="btn link-reset" role="button">
+            Новая трансляция
+          </Link>
+        )}
       </div>
 
       <p className="muted">
@@ -114,10 +118,14 @@ export default function DashboardClient() {
       {items?.length === 0 && (
         <div className="card">
           <h2>Пока нет трансляций</h2>
-          <p className="muted">Создайте запись трансляции, затем выдайте зрителям персональные ссылки.</p>
-          <Link href="/dashboard/streams/new" className="btn link-reset" role="button">
-            Создать первую трансляцию
-          </Link>
+          <p className="muted">
+            {canCreate ? "Создайте запись трансляции, затем выдайте зрителям персональные ссылки." : "У вашего аккаунта нет права создавать трансляции. Зрителям достаточно открыть персональную ссылку от организатора."}
+          </p>
+          {canCreate && (
+            <Link href="/dashboard/streams/new" className="btn link-reset" role="button">
+              Создать первую трансляцию
+            </Link>
+          )}
         </div>
       )}
 

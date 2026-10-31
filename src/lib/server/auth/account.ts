@@ -145,7 +145,7 @@ async function upsertUserOnLogin(info: LoginInfo): Promise<UserDoc> {
       contactEmail: null,
       role: "USER",
       status: "ACTIVE",
-      permissions: { canCreateStreams: true },
+      permissions: { canCreateStreams: false },
       limits: { maxActiveStreams: SETTINGS.defaultMaxActiveStreams, maxLinksLifetime: SETTINGS.defaultMaxLinksLifetime },
       accessUntil: null,
       authSyncStatus: "SYNCED",

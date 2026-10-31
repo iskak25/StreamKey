@@ -4,14 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, errCode, isAuthError, messageFor } from "@/lib/client/api";
 import PaymentOverlay from "@/components/PaymentOverlay";
-import { guestIdToken } from "@/lib/client/firebase";
-
-/** Silent guest session: an anonymous Firebase user exchanged for our session cookie. The viewer sees no sign-in step. */
-async function startGuestSession(): Promise<void> {
-  const idToken = await guestIdToken();
-  const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
-  await api("/auth/session", { method: "POST", csrf: csrfToken, body: { idToken } });
-}
+import { startGuestSession } from "@/lib/client/guest";
 
 /**
  * Straight to the payment page; without an account a guest session is created silently first.
@@ -45,6 +38,11 @@ export default function BuyButton({
     lock.current = true;
     setBusy(true);
     setError(null);
+    const fail = (message: string) => {
+      setError(message);
+      lock.current = false;
+      setBusy(false);
+    };
     const checkout = async () => {
       const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
       return api<{ redirectUrl: string }>(`/concerts/${concertId}/checkout`, { method: "POST", csrf: csrfToken, body: {} });
@@ -69,14 +67,9 @@ export default function BuyButton({
       if (typeof fbCode === "string" && fbCode.startsWith("auth/")) {
         // Firebase refused the silent guest session (typically: Anonymous sign-in is off in the project).
         console.error("guest session failed:", fbCode);
-        setError(`Покупка без входа сейчас недоступна. Войдите через Google или попробуйте позже. (${fbCode})`);
-        lock.current = false;
-        setBusy(false);
-        return;
+        return fail(`Покупка без входа сейчас недоступна. Войдите через Google или попробуйте позже. (${fbCode})`);
       }
-      setError(errCode(e) === "TEMPORARY_UNAVAILABLE" ? "Онлайн-оплата пока недоступна. Попробуйте позже." : messageFor(errCode(e)));
-      lock.current = false;
-      setBusy(false);
+      fail(errCode(e) === "TEMPORARY_UNAVAILABLE" ? "Онлайн-оплата пока недоступна. Попробуйте позже." : messageFor(errCode(e)));
     }
   }, [concertId, signedIn]);
 

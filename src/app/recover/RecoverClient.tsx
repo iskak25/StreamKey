@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { api, errCode, messageFor } from "@/lib/client/api";
-import { guestIdToken } from "@/lib/client/firebase";
+import { startGuestSession } from "@/lib/client/guest";
 
 /** Moves a paid ticket to this browser's session using the one-time recovery code shown after purchase. */
 export default function RecoverClient({ signedIn }: { signedIn: boolean }) {
@@ -16,11 +16,7 @@ export default function RecoverClient({ signedIn }: { signedIn: boolean }) {
     setBusy(true);
     setError(null);
     try {
-      if (!signedIn) {
-        const idToken = await guestIdToken();
-        const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
-        await api("/auth/session", { method: "POST", csrf: csrfToken, body: { idToken } });
-      }
+      if (!signedIn) await startGuestSession();
       const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
       const r = await api<{ orderId: string }>("/orders/recover", { method: "POST", csrf: csrfToken, body: { code } });
       window.location.assign(`/orders/${r.orderId}`);

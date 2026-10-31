@@ -21,6 +21,7 @@ export const COLLECTIONS = {
   auditLogs: "audit_logs",
   authJobs: "auth_jobs",
   rateBuckets: "rate_buckets",
+  streamCovers: "stream_covers",
 } as const;
 
 const ts = z.instanceof(Timestamp);
@@ -76,6 +77,14 @@ export const StreamDoc = z.object({
   accessVersion: z.number().int().min(0),
   hasIssuedLinks: z.boolean(),
   linksIssued: z.number().int().min(0).optional(), // absent on streams created before the counter existed
+  // Concert catalog fields (admin-managed). Absent on plain organizer streams, which are never listed publicly.
+  publicationStatus: z.enum(["draft", "published", "archived"]).optional(),
+  priceKgs: z.number().int().min(0).optional(),
+  startsAt: ts.optional(),
+  endsAt: ts.optional(),
+  coverPath: z.string().nullable().optional(),
+  coverUpdatedAt: tsNullable.optional(),
+  createdBy: z.string().optional(),
   version: z.number().int().min(0),
   createdAt: ts,
   updatedAt: ts,

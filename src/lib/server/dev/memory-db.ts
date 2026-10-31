@@ -18,7 +18,7 @@ interface Row {
 const MAX_RETRIES = 5;
 
 function clone<T>(v: T): T {
-  if (v instanceof Timestamp || v === null || typeof v !== "object") return v;
+  if (v instanceof Timestamp || v === null || typeof v !== "object" || Buffer.isBuffer(v)) return v;
   if (Array.isArray(v)) return v.map(clone) as T;
   return Object.fromEntries(Object.entries(v as Data).map(([k, x]) => [k, clone(x)])) as T;
 }

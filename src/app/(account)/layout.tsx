@@ -18,6 +18,8 @@ export default async function AccountLayout({ children }: { children: ReactNode 
       <header className="topbar">
         <Link href="/dashboard" aria-label="StreamKey — мои трансляции"><Logo width={120} /></Link>
         <div className="topbar-right">
+          <Link href="/">Концерты</Link>
+          {(acc.actor.role === "ADMIN" || acc.actor.role === "SUPER_ADMIN") && <Link href="/admin/concerts">Управление трансляциями</Link>}
           <span className="muted">{acc.user.displayName}</span>
           <SignOutButton />
         </div>

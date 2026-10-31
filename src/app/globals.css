@@ -171,3 +171,26 @@ dialog.modal::backdrop { background: rgba(10, 12, 18, .55); }
 /* Owner decision: the viewer cannot hover/click the YouTube iframe, so YouTube's hover UI (title, share, pause icon) never opens.
    Playback is driven only through our own controls. The iframe itself is not covered, cropped or restyled. */
 .watch-screen .player-box iframe { pointer-events: none; }
+
+/* ---------- Concert catalog ---------- */
+.page-wide { max-width: 1100px; }
+.concert-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+.concert-card { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.concert-cover { aspect-ratio: 16 / 9; background: var(--field); overflow: hidden; }
+.concert-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.concert-cover-empty { height: 100%; display: grid; place-items: center; font-size: 3rem; color: var(--muted); }
+.concert-cover-large { border-radius: 16px; }
+.concert-body { display: flex; flex-direction: column; align-items: flex-start; gap: .5rem; padding: 1rem 1.25rem 1.25rem; flex: 1; }
+.concert-body h2 { margin: 0; font-size: 1.25rem; }
+.concert-body p { margin: 0; }
+.concert-body .btn { margin-top: auto; }
+.concert-meta { color: var(--muted); }
+.concert-price { font-weight: 700; font-size: 1.1rem; }
+.concert-description { white-space: pre-wrap; }
+
+/* ---------- Admin concerts ---------- */
+.steps { display: flex; gap: .5rem; flex-wrap: wrap; padding: 0; margin: 0; list-style: none; }
+.steps li { padding: .3rem .9rem; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+.steps li[aria-current="step"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+.yt-thumb { max-width: 360px; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; background: var(--field); }
+.cover-preview { max-width: 360px; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; background: var(--field); }

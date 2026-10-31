@@ -3,6 +3,7 @@ import EmptyState from "@/components/EmptyState";
 import PublicPlayer from "@/components/PublicPlayer";
 import PublicShell from "@/components/PublicShell";
 import { getPublicViewingConcert, type PublicViewingConcert } from "@/lib/server/concerts";
+import { fallbackVideoId } from "@/lib/server/public-viewing";
 import { getViewer } from "@/lib/server/viewer";
 import { formatBishkek } from "@/lib/shared/concerts";
 
@@ -17,30 +18,32 @@ export default async function PublicViewing({ id }: { id: string }) {
   }
   const user = await getViewer().catch(() => null);
 
+  const videoId = concert?.videoId ?? fallbackVideoId(id);
+
   return (
     <PublicShell user={user} active="concerts">
       <div className="container section stack">
-        {failed ? (
+        {concert ? (
+          <div className="stack">
+            <ConcertStatusBadge phase={concert.phase} />
+            <h1 className="title-page">{concert.title}</h1>
+            <p className="muted">
+              {formatBishkek(concert.startsAt)} — {formatBishkek(concert.endsAt)}
+            </p>
+          </div>
+        ) : (
+          videoId && <h1 className="title-page">Прямая трансляция</h1>
+        )}
+        {videoId ? (
+          <PublicPlayer videoId={videoId} />
+        ) : failed ? (
           <EmptyState title="Сервис временно недоступен" text="Не удалось загрузить трансляцию. Обновите страницу через пару минут." />
         ) : !concert ? (
           <EmptyState title="Концерт не найден" text="Проверьте ссылку или откройте афишу." action={{ href: "/concerts", label: "Смотреть концерты" }} />
         ) : (
-          <>
-            <div className="stack">
-              <ConcertStatusBadge phase={concert.phase} />
-              <h1 className="title-page">{concert.title}</h1>
-              <p className="muted">
-                {formatBishkek(concert.startsAt)} — {formatBishkek(concert.endsAt)}
-              </p>
-            </div>
-            {concert.videoId ? (
-              <PublicPlayer videoId={concert.videoId} />
-            ) : (
-              <EmptyState title="Трансляция пока не настроена" text="Организатор ещё не указал ссылку на YouTube. Загляните позже." />
-            )}
-            {concert.description && <p className="concert-description">{concert.description}</p>}
-          </>
+          <EmptyState title="Трансляция пока не настроена" text="Организатор ещё не указал ссылку на YouTube. Загляните позже." />
         )}
+        {concert?.description && <p className="concert-description">{concert.description}</p>}
       </div>
     </PublicShell>
   );

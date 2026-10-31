@@ -257,6 +257,37 @@ export async function getPublishedConcert(id: string) {
   return withPhase(c, Date.now());
 }
 
+/**
+ * Public-viewing concert (see public-viewing.ts): the one place a YouTube video id leaves the server without a ticket.
+ * Only called for ids on that explicit list. Any publication status is shown, so the link keeps working for the owner.
+ * Cached like the catalog; the phase is recomputed per call.
+ */
+export interface PublicViewingConcert {
+  id: string;
+  title: string;
+  description: string;
+  startsAt: string;
+  endsAt: string;
+  phase: PublicConcert["phase"];
+  videoId: string | null;
+}
+
+const readPublicViewing = unstable_cache(
+  async (id: string): Promise<Omit<PublicViewingConcert, "phase"> | null> => {
+    const s = (await ref(id).get()).data() as StreamDoc | undefined;
+    if (!s) return null;
+    const dto = publicConcertDto(id, s, true);
+    return { id, title: dto.title, description: dto.description, startsAt: dto.startsAt, endsAt: dto.endsAt, videoId: s.youtubeVideoId || null };
+  },
+  ["public-viewing"],
+  { revalidate: CATALOG_TTL, tags: [CATALOG_TAG] },
+);
+
+export async function getPublicViewingConcert(id: string): Promise<PublicViewingConcert | null> {
+  const c = await readPublicViewing(id);
+  return c ? { ...c, phase: concertPhase(Date.now(), Date.parse(c.startsAt), Date.parse(c.endsAt)) } : null;
+}
+
 // ---------- covers ----------
 
 function sniffImage(b: Buffer): "image/jpeg" | "image/png" | "image/webp" | null {

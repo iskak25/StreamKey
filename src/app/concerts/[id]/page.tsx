@@ -7,6 +7,8 @@ import ConcertStatusBadge from "@/components/ConcertStatusBadge";
 import EmptyState from "@/components/EmptyState";
 import PublicShell from "@/components/PublicShell";
 import TicketPurchaseCard from "@/components/TicketPurchaseCard";
+import { isPublicViewing } from "@/lib/server/public-viewing";
+import PublicViewing from "./PublicViewing";
 import { getPublishedConcert } from "@/lib/server/concerts";
 import { orderStateFor } from "@/lib/server/orders";
 import { ApiError } from "@/lib/shared/errors";
@@ -18,6 +20,8 @@ export const metadata: Metadata = { title: "Концерт — StreamKey" };
 export default async function ConcertPage({ params }: { params: Promise<{ id: string }> }) {
   await connection();
   const { id } = await params;
+  // Explicit per-concert exception: open viewing without a ticket (see public-viewing.ts). Others stay protected.
+  if (isPublicViewing(id)) return <PublicViewing id={id} />;
   let concert: Awaited<ReturnType<typeof getPublishedConcert>>;
   try {
     concert = await getPublishedConcert(id);

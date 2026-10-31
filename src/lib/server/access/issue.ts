@@ -127,7 +127,7 @@ export async function issueLink(input: IssueInput): Promise<IssueResult> {
     }
 
     const usage = (usageSnap.data() as UsageDoc | undefined) ?? { issuedLifetime: 0, activeStreams: 0 };
-    if (usage.issuedLifetime >= owner.limits.maxLinksLifetime) throw new ApiError("QUOTA_EXCEEDED", "Лимит выданных ссылок исчерпан");
+    // No lifetime cap on issued links: the number is only counted (usage.issuedLifetime), never refused.
 
     const expiresAt = Timestamp.fromDate(input.expiresAt);
     const link: AccessLinkDoc = {

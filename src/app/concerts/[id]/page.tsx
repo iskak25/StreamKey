@@ -4,10 +4,12 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { ticketState } from "@/components/ConcertCard";
 import ConcertStatusBadge from "@/components/ConcertStatusBadge";
+import EmptyState from "@/components/EmptyState";
 import PublicShell from "@/components/PublicShell";
 import TicketPurchaseCard from "@/components/TicketPurchaseCard";
 import { getPublishedConcert } from "@/lib/server/concerts";
 import { orderStateFor } from "@/lib/server/orders";
+import { ApiError } from "@/lib/shared/errors";
 import { getViewer } from "@/lib/server/viewer";
 import { formatBishkek, formatPrice } from "@/lib/shared/concerts";
 
@@ -16,8 +18,20 @@ export const metadata: Metadata = { title: "Концерт — StreamKey" };
 export default async function ConcertPage({ params }: { params: Promise<{ id: string }> }) {
   await connection();
   const { id } = await params;
-  const concert = await getPublishedConcert(id).catch(() => null);
-  if (!concert) notFound();
+  let concert: Awaited<ReturnType<typeof getPublishedConcert>>;
+  try {
+    concert = await getPublishedConcert(id);
+  } catch (e) {
+    if (e instanceof ApiError && e.code === "NOT_FOUND") notFound();
+    // A storage outage is not a missing page: do not tell a QR scanner the concert does not exist.
+    return (
+      <PublicShell user={await getViewer().catch(() => null)} active="concerts">
+        <div className="container section">
+          <EmptyState title="Сервис временно недоступен" text="Не удалось загрузить концерт. Обновите страницу через пару минут." />
+        </div>
+      </PublicShell>
+    );
+  }
   const user = await getViewer();
   const order = user ? await orderStateFor(user.uid, id).catch(() => null) : null;
   const purchase = {

@@ -432,3 +432,11 @@ dialog.modal::backdrop { background: rgba(5, 6, 10, 0.72); }
 .qr-preview img { display: block; max-width: 100%; height: auto; }
 .qr-skeleton { width: 240px; height: 240px; }
 .qr-url { overflow-wrap: anywhere; }
+
+/* Full-screen skeleton while a payment is being prepared */
+.pay-overlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: var(--bg, #0b0c10); }
+.pay-overlay-inner { width: min(420px, 100%); display: flex; flex-direction: column; gap: 14px; text-align: center; }
+.pay-overlay-cover { aspect-ratio: 4 / 3; border-radius: var(--radius-lg); }
+.pay-overlay-line { height: 18px; }
+.pay-overlay-line.short { width: 60%; align-self: center; }
+.pay-overlay-btn { height: 52px; border-radius: var(--radius-lg); }

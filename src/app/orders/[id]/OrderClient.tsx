@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import PaymentOverlay from "@/components/PaymentOverlay";
 import { api, errCode, isAuthError, messageFor } from "@/lib/client/api";
 import { formatPrice } from "@/lib/shared/concerts";
 
@@ -105,6 +106,7 @@ export default function OrderClient({ orderId }: { orderId: string }) {
 
   return (
     <div className="card">
+      {busy && order && !order.paid && <PaymentOverlay text="Открываем оплату…" />}
       <h1>Ваш билет</h1>
       {lostSession && (
         <>

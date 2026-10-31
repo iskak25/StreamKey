@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, errCode, isAuthError, messageFor } from "@/lib/client/api";
+import PaymentOverlay from "@/components/PaymentOverlay";
 import { guestIdToken } from "@/lib/client/firebase";
 
 /** Silent guest session: an anonymous Firebase user exchanged for our session cookie. The viewer sees no sign-in step. */
@@ -107,6 +108,7 @@ export default function BuyButton({
   const label = busy ? "Подготовка оплаты…" : free ? "Получить билет" : "Купить билет";
   return (
     <>
+      {busy && <PaymentOverlay />}
       <button className={size} type="button" onClick={buy} aria-busy={busy || undefined} disabled={busy}>
         {label}
       </button>

@@ -72,3 +72,10 @@ export const GoogleIcon = ({ size = 20 }: { size?: number }) => (
     <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.9 2.3-8.3 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z" />
   </svg>
 );
+
+export const QrIcon = ({ size }: { size?: number }) => (
+  <Icon size={size ?? 18}>
+    <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z" />
+    <path d="M14 14h3v3h-3zM20 14v3M14 20h3M20 20h1" />
+  </Icon>
+);

@@ -64,6 +64,15 @@ export default function BuyButton({
         window.location.assign(`/login?next=${encodeURIComponent(`/concerts/${concertId}?buy=1`)}`);
         return;
       }
+      const fbCode = (e as { code?: string } | null)?.code;
+      if (typeof fbCode === "string" && fbCode.startsWith("auth/")) {
+        // Firebase refused the silent guest session (typically: Anonymous sign-in is off in the project).
+        console.error("guest session failed:", fbCode);
+        setError("Покупка без входа сейчас недоступна. Войдите через Google или попробуйте позже.");
+        lock.current = false;
+        setBusy(false);
+        return;
+      }
       setError(errCode(e) === "TEMPORARY_UNAVAILABLE" ? "Онлайн-оплата пока недоступна. Попробуйте позже." : messageFor(errCode(e)));
       lock.current = false;
       setBusy(false);

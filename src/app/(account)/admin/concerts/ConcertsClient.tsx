@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, errCode, isAuthError, organizerMessage } from "@/lib/client/api";
 import { formatBishkek, formatPrice, PUBLICATION_LABEL, type PublicationStatus } from "@/lib/shared/concerts";
+import ConcertQr from "@/components/ConcertQr";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import EmptyState from "@/components/EmptyState";
 import { RowListSkeleton } from "@/components/LoadingSkeleton";
@@ -36,6 +37,7 @@ export default function ConcertsClient() {
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [confirmArchive, setConfirmArchive] = useState<Concert | null>(null);
+  const [qrFor, setQrFor] = useState<Concert | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "startsAt", dir: -1 });
@@ -210,6 +212,9 @@ export default function ConcertsClient() {
                                 <Link className="btn btn-ghost btn-sm link-reset" role="button" href={`/dashboard/streams/${c.id}`}>
                                   Ключи
                                 </Link>
+                                <button className="btn btn-ghost btn-sm" type="button" onClick={() => setQrFor(c)}>
+                                  QR-код
+                                </button>
                                 <button className="btn btn-danger btn-sm" type="button" disabled={busy} onClick={() => setConfirmArchive(c)}>
                                   В архив
                                 </button>
@@ -241,6 +246,7 @@ export default function ConcertsClient() {
           )}
         </>
       )}
+      {qrFor && <ConcertQr concertId={qrFor.id} title={qrFor.title} open onClose={() => setQrFor(null)} />}
       <ConfirmDialog
         open={confirmArchive !== null}
         title="Отправить концерт в архив?"

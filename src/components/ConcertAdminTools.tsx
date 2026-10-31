@@ -4,17 +4,19 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, errCode, organizerMessage } from "@/lib/client/api";
+import ConcertQr from "./ConcertQr";
 import ConfirmDialog from "./ConfirmDialog";
-import { PencilIcon, TrashIcon } from "./icons";
+import { PencilIcon, QrIcon, TrashIcon } from "./icons";
 
 /**
  * Admin-only shortcuts on a catalog card: edit and delete. "Delete" archives the concert
  * (it leaves the catalog and its access links stop working); purchase records are kept.
  * The buttons are a convenience: the admin API re-checks the role on every call.
  */
-export default function ConcertAdminTools({ concertId }: { concertId: string }) {
+export default function ConcertAdminTools({ concertId, title }: { concertId: string; title: string }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
@@ -43,10 +45,14 @@ export default function ConcertAdminTools({ concertId }: { concertId: string }) 
         <Link className="concert-tool" href={`/admin/concerts/${concertId}`} aria-label="Редактировать концерт" title="Редактировать">
           <PencilIcon />
         </Link>
+        <button className="concert-tool" type="button" onClick={() => setQrOpen(true)} aria-label="QR-код концерта" title="QR-код">
+          <QrIcon />
+        </button>
         <button className="concert-tool concert-tool-danger" type="button" onClick={() => setConfirming(true)} aria-label="Удалить концерт" title="Удалить">
           <TrashIcon />
         </button>
       </div>
+      <ConcertQr concertId={concertId} title={title} open={qrOpen} onClose={() => setQrOpen(false)} />
       <ConfirmDialog
         open={confirming}
         title="Удалить концерт?"

@@ -85,7 +85,7 @@ export default function ConcertCard({
 
   return (
     <article className="concert-card">
-      {adminTools && <ConcertAdminTools concertId={concert.id} />}
+      {adminTools && <ConcertAdminTools concertId={concert.id} title={concert.title} />}
       <div className="concert-cover">
         {cover}
         <ConcertStatusBadge phase={concert.phase} />

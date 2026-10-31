@@ -3,8 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiFail } from "@/lib/client/api";
-import Logo from "@/components/Logo";
 import { googleIdToken } from "@/lib/client/firebase";
+import { GoogleIcon } from "@/components/icons";
 
 function errorText(e: unknown): string {
   if (e instanceof ApiFail) {
@@ -22,6 +22,7 @@ export default function LoginClient({ next }: { next: string | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const buying = next?.startsWith("/concerts/") ?? false;
 
   async function signIn() {
     setBusy(true);
@@ -30,7 +31,7 @@ export default function LoginClient({ next }: { next: string | null }) {
       const idToken = await googleIdToken();
       const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
       await api("/auth/session", { method: "POST", csrf: csrfToken, body: { idToken } });
-      router.replace(next ?? "/dashboard");
+      router.replace(next ?? "/");
     } catch (e) {
       setError(errorText(e));
       setBusy(false);
@@ -38,19 +39,23 @@ export default function LoginClient({ next }: { next: string | null }) {
   }
 
   return (
-    <div className="card">
-      <Logo width={200} plate />
-      <h1>{next ? "Вход для покупки билета" : "Вход для организаторов"}</h1>
-      <p>{next ? "Войдите через Google, чтобы оплатить билет. После оплаты вы сразу попадёте на трансляцию." : "Войдите через Google, чтобы создавать трансляции и выдавать приглашения."}</p>
-      {!next && <p className="muted">Зрителям вход не нужен: достаточно открыть присланную ссылку-приглашение.</p>}
-      <button className="btn" type="button" onClick={signIn} disabled={busy}>
-        {busy ? "Входим…" : "Войти через Google"}
+    <div className="card auth-card">
+      <div className="stack">
+        <h1>{buying ? "Войдите, чтобы купить билет" : "Вход в StreamKey"}</h1>
+        <p className="muted">
+          {buying ? "После входа вы вернётесь к концерту, и оплата начнётся сразу." : "Войдите через Google, чтобы покупать билеты и смотреть трансляции."}
+        </p>
+      </div>
+      <button className="btn btn-google btn-lg btn-block" type="button" onClick={signIn} aria-busy={busy || undefined} disabled={busy}>
+        <GoogleIcon />
+        {busy ? "Входим…" : "Продолжить с Google"}
       </button>
       {error && (
         <p className="notice notice-error" role="alert">
           {error}
         </p>
       )}
+      <p className="hint">Мы получаем только имя, email и фото вашего Google-аккаунта. Пароль остаётся у Google.</p>
     </div>
   );
 }

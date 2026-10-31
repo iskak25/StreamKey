@@ -70,7 +70,7 @@ export default function InviteClient() {
 
   return (
     <div className="card">
-      <Logo width={200} plate />
+      <Logo width={160} />
       <h1>Приглашение на трансляцию</h1>
       <p>Доступ закрепится за этим браузером. Не очищайте cookies до окончания просмотра.</p>
       <p className="muted">Ссылка одноразовая: после нажатия она будет привязана к этому браузеру и не откроется в другом.</p>

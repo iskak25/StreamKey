@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import Logo from "@/components/Logo";
-import BuyButton from "./BuyButton";
-import { getAccountOrNull } from "@/lib/server/auth/page";
+import { ticketState } from "@/components/ConcertCard";
+import ConcertStatusBadge from "@/components/ConcertStatusBadge";
+import PublicShell from "@/components/PublicShell";
+import TicketPurchaseCard from "@/components/TicketPurchaseCard";
 import { getPublishedConcert } from "@/lib/server/concerts";
-import { paidOrderId } from "@/lib/server/orders";
-import { formatBishkek, formatPrice, PHASE_LABEL } from "@/lib/shared/concerts";
+import { orderStateFor } from "@/lib/server/orders";
+import { getViewer } from "@/lib/server/viewer";
+import { formatBishkek, formatPrice } from "@/lib/shared/concerts";
 
 export const metadata: Metadata = { title: "Концерт — StreamKey" };
 
@@ -16,38 +18,71 @@ export default async function ConcertPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   const concert = await getPublishedConcert(id).catch(() => null);
   if (!concert) notFound();
-  const acc = await getAccountOrNull();
-  const paidOrder = acc ? await paidOrderId(acc.actor.uid, id).catch(() => null) : null;
+  const user = await getViewer();
+  const order = user ? await orderStateFor(user.uid, id).catch(() => null) : null;
+  const purchase = {
+    concertId: concert.id,
+    phase: concert.phase,
+    priceKgs: concert.priceKgs,
+    signedIn: user !== null,
+    ticket: ticketState(order?.status),
+    orderId: order?.id ?? null,
+  };
 
   return (
-    <div className="light">
-      <header className="topbar">
-        <Link href="/" aria-label="StreamKey — все концерты">
-          <Logo width={120} />
-        </Link>
-      </header>
-      <main className="page stack">
-        <Link href="/">← Все концерты</Link>
-        {concert.coverUrl && (
-          <div className="concert-cover concert-cover-large">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={concert.coverUrl} alt="" />
+    <PublicShell user={user} active="concerts" purchaseBar>
+      <div className="container">
+        <div className="concert-layout">
+          <div className="stack">
+            <Link href="/concerts" className="muted link-reset">
+              ← Все концерты
+            </Link>
+            <div className="concert-hero-img">
+              {concert.coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={concert.coverUrl} alt="" width={1280} height={800} fetchPriority="high" decoding="async" />
+              ) : null}
+            </div>
+            <div className="stack">
+              <ConcertStatusBadge phase={concert.phase} />
+              <h1 className="title-page">{concert.title}</h1>
+              {concert.description && <p className="concert-description">{concert.description}</p>}
+            </div>
+
+            <div className="info-grid">
+              <div className="info-item">
+                <span className="label">Начало</span>
+                <span className="value">{formatBishkek(concert.startsAt)}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Окончание</span>
+                <span className="value">{formatBishkek(concert.endsAt)}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Билет</span>
+                <span className="value">{formatPrice(concert.priceKgs)}</span>
+              </div>
+              <div className="info-item">
+                <span className="label">Где смотреть</span>
+                <span className="value">В одном браузере: компьютер, телефон или планшет</span>
+              </div>
+            </div>
+
+            <section className="stack" aria-labelledby="how">
+              <h2 id="how">Как получить доступ</h2>
+              <ol className="steps-list">
+                <li>Нажмите «Купить билет» и оплатите по QR-коду. Регистрация не нужна.</li>
+                <li>После оплаты вы сразу получите личную ссылку на трансляцию.</li>
+                <li>Откройте её в браузере, где будете смотреть. Ссылка одноразовая и закрепляется за этим браузером.</li>
+                <li>Не очищайте cookies до конца концерта, иначе доступ придётся получить заново.</li>
+              </ol>
+            </section>
           </div>
-        )}
-        <span className="pill">{PHASE_LABEL[concert.phase]}</span>
-        <h1>{concert.title}</h1>
-        <p className="concert-meta">
-          {formatBishkek(concert.startsAt)} — {formatBishkek(concert.endsAt)}
-        </p>
-        {concert.description && <p className="concert-description">{concert.description}</p>}
-        <p className="concert-price">{formatPrice(concert.priceKgs)}</p>
-        <BuyButton concertId={concert.id} ended={concert.phase === "ended"} free={concert.priceKgs === 0} paidOrderId={paidOrder} />
-        <p className="muted">
-          {paidOrder
-            ? "Билет оплачен. Ссылка на трансляцию открывается один раз и закрепляется за вашим браузером."
-            : "После оплаты вы сразу получите персональную ссылку на трансляцию. Ссылка открывается один раз и закрепляется за вашим браузером."}
-        </p>
-      </main>
-    </div>
+
+          <TicketPurchaseCard {...purchase} variant="card" />
+        </div>
+      </div>
+      <TicketPurchaseCard {...purchase} variant="bar" />
+    </PublicShell>
   );
 }

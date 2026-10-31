@@ -1,50 +1,87 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
-import ConcertCard from "@/components/ConcertCard";
-import Logo from "@/components/Logo";
-import { getAccountOrNull } from "@/lib/server/auth/page";
+import ConcertCard, { ticketState } from "@/components/ConcertCard";
+import EmptyState from "@/components/EmptyState";
+import HeroConcert from "@/components/HeroConcert";
+import PublicShell from "@/components/PublicShell";
 import { listPublishedConcerts } from "@/lib/server/concerts";
+import { ticketStatusMap } from "@/lib/server/orders";
+import { getViewer } from "@/lib/server/viewer";
 
-export const metadata: Metadata = { title: "StreamKey — концерты", description: "Онлайн-трансляции с персональным доступом" };
+export const metadata: Metadata = { title: "StreamKey — онлайн-концерты", description: "Афиша онлайн-концертов с персональным доступом" };
+
+type Concerts = Awaited<ReturnType<typeof listPublishedConcerts>>;
 
 export default async function Home() {
   await connection();
-  let concerts: Awaited<ReturnType<typeof listPublishedConcerts>> = [];
+  const user = await getViewer();
+  let concerts: Concerts = [];
   let failed = false;
   try {
     concerts = await listPublishedConcerts();
   } catch {
     failed = true;
   }
-
-  // Only a convenience: the edit page and every admin API re-check the role on the server.
-  const acc = await getAccountOrNull();
-  const isAdmin = acc?.actor.status === "ACTIVE" && (acc.actor.role === "ADMIN" || acc.actor.role === "SUPER_ADMIN");
+  const tickets: Awaited<ReturnType<typeof ticketStatusMap>> = user ? await ticketStatusMap(user.uid).catch(() => ({})) : {};
+  const live = concerts.filter((c) => c.phase === "live");
+  const soon = concerts.filter((c) => c.phase === "soon");
+  const ended = concerts.filter((c) => c.phase === "ended");
+  // Featured: what is on air, else what starts next, else the latest finished one. Nothing is invented.
+  const featured = live[0] ?? soon[0] ?? ended[0] ?? null;
+  const grid = (items: Concerts, eagerFrom = 0) => (
+    <div className="concert-grid">
+      {items.map((c, i) => (
+        <ConcertCard key={c.id} concert={c} href={`/concerts/${c.id}`} ticket={ticketState(tickets[c.id])} adminTools={user?.isAdmin} eager={i < eagerFrom} />
+      ))}
+    </div>
+  );
 
   return (
-    <div className="light">
-      <header className="topbar">
-        <Logo width={120} />
-        <div className="topbar-right">
-          <Link href="/dashboard">Кабинет организатора</Link>
+    <PublicShell user={user} active="home">
+      {failed && (
+        <div className="container section">
+          <p className="notice notice-error" role="alert">
+            Не удалось загрузить афишу. Обновите страницу чуть позже.
+          </p>
         </div>
-      </header>
-      <main className="page page-wide stack">
-        <h1>Концерты</h1>
-        {failed && <p className="notice notice-error" role="alert">Не удалось загрузить список. Обновите страницу чуть позже.</p>}
-        {!failed && concerts.length === 0 && (
-          <div className="card">
-            <h2>Пока нет опубликованных концертов</h2>
-            <p className="muted">Загляните позже: новые трансляции появятся здесь.</p>
-          </div>
-        )}
-        <div className="concert-grid">
-          {concerts.map((c) => (
-            <ConcertCard key={c.id} concert={c} href={`/concerts/${c.id}`} editHref={isAdmin ? `/admin/concerts/${c.id}` : null} />
-          ))}
+      )}
+      {!failed && concerts.length === 0 && (
+        <div className="container section">
+          <EmptyState title="Пока нет опубликованных концертов" text="Загляните позже: новые трансляции появятся здесь." />
         </div>
-      </main>
-    </div>
+      )}
+      {featured && <HeroConcert concert={featured} ticket={ticketState(tickets[featured.id])} />}
+
+      {concerts.length > 0 && (
+        <>
+          <section className="container section" aria-labelledby="live-title">
+            <div className="section-head">
+              <h2 id="live-title">Сейчас в эфире</h2>
+            </div>
+            {live.length > 0 ? grid(live, 4) : <EmptyState title="Сейчас нет прямых эфиров" text="Ближайшие концерты ниже в разделе «Скоро начнутся»." />}
+          </section>
+
+          <section className="container section" aria-labelledby="soon-title">
+            <div className="section-head">
+              <h2 id="soon-title">Скоро начнутся</h2>
+              <Link href="/concerts" className="muted link-reset">
+                Все концерты →
+              </Link>
+            </div>
+            {soon.length > 0 ? grid(soon) : <EmptyState title="Новые концерты появятся здесь" text="Анонсы пока не опубликованы." />}
+          </section>
+
+          {ended.length > 0 && (
+            <section className="container section" aria-labelledby="ended-title">
+              <div className="section-head">
+                <h2 id="ended-title">Завершённые</h2>
+              </div>
+              {grid(ended)}
+            </section>
+          )}
+        </>
+      )}
+    </PublicShell>
   );
 }

@@ -13,6 +13,7 @@ interface Order {
   paid: boolean;
   claimed: boolean;
   linkId: string | null;
+  guest: boolean;
 }
 
 const POLL_MS = 3000;
@@ -26,9 +27,12 @@ export default function OrderClient({ orderId }: { orderId: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lostSession, setLostSession] = useState(false);
+  const [code, setCode] = useState<string | null>(null);
   const lock = useRef(false);
 
-  const toLogin = useCallback(() => window.location.assign(`/login?next=${encodeURIComponent(`/orders/${orderId}`)}`), [orderId]);
+  // No session (guest session lost or expired): offer Google sign-in or the recovery code instead of a dead end.
+  const toLogin = useCallback(() => setLostSession(true), []);
 
   const claim = useCallback(async () => {
     if (lock.current) return;
@@ -46,6 +50,15 @@ export default function OrderClient({ orderId }: { orderId: string }) {
       setBusy(false);
     }
   }, [orderId, toLogin]);
+
+  async function showCode() {
+    try {
+      const { csrfToken } = await api<{ csrfToken: string }>("/csrf");
+      setCode((await api<{ code: string }>(`/orders/${orderId}/recovery`, { method: "POST", csrf: csrfToken, body: {} })).code);
+    } catch (e) {
+      setError(messageFor(errCode(e)));
+    }
+  }
 
   useEffect(() => {
     let stopped = false;
@@ -76,9 +89,22 @@ export default function OrderClient({ orderId }: { orderId: string }) {
   return (
     <div className="card">
       <h1>Ваш билет</h1>
-      {!order && !error && <p className="muted">Загрузка…</p>}
-      {order && !order.paid && <p className="muted">Ждём подтверждения оплаты ({formatPrice(order.amountKgs)}). Страница обновится сама.</p>}
-      {order?.paid && !order.claimed && !error && <p className="muted">Оплата получена. Открываем трансляцию…</p>}
+      {lostSession && (
+        <>
+          <p>Не удалось найти ваш билет в этом браузере. Если вы покупали без входа, а данные браузера были очищены, восстановите билет по коду.</p>
+          <p className="actions">
+            <Link href="/recover" className="btn link-reset" role="button">
+              Восстановить по коду
+            </Link>
+            <Link href={`/login?next=${encodeURIComponent(`/orders/${orderId}`)}`} className="btn btn-ghost link-reset" role="button">
+              Войти через Google
+            </Link>
+          </p>
+        </>
+      )}
+      {!order && !error && !lostSession && <p className="muted">Проверяем оплату…</p>}
+      {order && !order.paid && <p className="muted">Ожидание оплаты ({formatPrice(order.amountKgs)}). Оплатите QR-код в приложении банка: страница обновится сама, ничего нажимать не нужно.</p>}
+      {order?.paid && !order.claimed && !error && <p className="muted">Оплата подтверждена. Открываем трансляцию…</p>}
       {order?.paid && order.claimed && (
         <>
           <p>Билет оплачен. Ссылка на трансляцию уже выдавалась.</p>
@@ -94,6 +120,26 @@ export default function OrderClient({ orderId }: { orderId: string }) {
             {busy ? "Выдаём…" : "Получить новую ссылку"}
           </button>
         </>
+      )}
+      {order?.paid && order.guest && (
+        <div className="stack">
+          <hr className="divider" />
+          {code ? (
+            <>
+              <p>
+                Код восстановления: <strong>{code}</strong>
+              </p>
+              <p className="muted">Сохраните его. Он показывается один раз и нужен, если вы потеряете доступ к этому браузеру.</p>
+            </>
+          ) : (
+            <button className="btn btn-ghost" type="button" onClick={showCode}>
+              Сохранить билет на случай потери доступа
+            </button>
+          )}
+          <Link href="/login" className="muted">
+            Или войдите через Google: билет закрепится за аккаунтом.
+          </Link>
+        </div>
       )}
       {error && (
         <p className="notice notice-error" role="alert">

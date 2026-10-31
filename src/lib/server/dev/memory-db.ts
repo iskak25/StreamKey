@@ -72,6 +72,18 @@ class Ref {
   async get(): Promise<Snap> {
     return new Snap(this, store.col(this.col).get(this.id));
   }
+  async set(data: Data) {
+    const prev = store.col(this.col).get(this.id);
+    store.col(this.col).set(this.id, { data: clone(data), version: (prev?.version ?? 0) + 1 });
+  }
+  async update(data: Data) {
+    const prev = store.col(this.col).get(this.id);
+    if (!prev) throw Object.assign(new Error("NOT_FOUND"), { code: 5 });
+    store.col(this.col).set(this.id, { data: { ...prev.data, ...clone(data) }, version: prev.version + 1 });
+  }
+  async delete() {
+    store.col(this.col).delete(this.id);
+  }
 }
 
 type Order = { field: string | FieldPath; dir: "asc" | "desc" };
@@ -79,14 +91,14 @@ type Order = { field: string | FieldPath; dir: "asc" | "desc" };
 class Query {
   constructor(
     private readonly col: string,
-    private readonly filters: [string, unknown][] = [],
+    private readonly filters: [string, unknown, boolean?][] = [],
     private readonly orders: Order[] = [],
     private readonly max = Infinity,
     private readonly after: unknown[] | null = null,
   ) {}
   where(field: string, op: string, value: unknown) {
-    if (op !== "==") throw new Error("memory-db: only == supported");
-    return new Query(this.col, [...this.filters, [field, value]], this.orders, this.max, this.after);
+    if (op !== "==" && op !== "array-contains") throw new Error("memory-db: only == and array-contains supported");
+    return new Query(this.col, [...this.filters, [field, value, op === "array-contains"]], this.orders, this.max, this.after);
   }
   orderBy(field: string | FieldPath, dir: "asc" | "desc" = "asc") {
     return new Query(this.col, this.filters, [...this.orders, { field, dir }], this.max, this.after);
@@ -99,7 +111,7 @@ class Query {
   }
   async get() {
     const val = (id: string, row: Row, f: string | FieldPath) => (f instanceof FieldPath ? id : row.data[f]);
-    let rows = [...store.col(this.col).entries()].filter(([, r]) => this.filters.every(([f, v]) => compareValue(r.data[f], v) === 0));
+    let rows = [...store.col(this.col).entries()].filter(([, r]) => this.filters.every(([f, v, arr]) => (arr ? Array.isArray(r.data[f]) && (r.data[f] as unknown[]).some((x) => compareValue(x, v) === 0) : compareValue(r.data[f], v) === 0)));
     const cmp = (aId: string, a: Row, bVals: unknown[] | null, bId: string, b: Row | null) => {
       for (const [i, o] of this.orders.entries()) {
         const x = val(aId, a, o.field);
@@ -127,7 +139,7 @@ class Collection extends Query {
 
 class Tx {
   private reads = new Map<string, number>();
-  private writes: { ref: Ref; kind: "create" | "set" | "update"; data: Data; merge?: boolean }[] = [];
+  private writes: { ref: Ref; kind: "create" | "set" | "update" | "delete"; data: Data; merge?: boolean }[] = [];
 
   async get(ref: Ref): Promise<Snap> {
     const row = store.col(ref.col).get(ref.id);
@@ -142,6 +154,9 @@ class Tx {
   }
   update(ref: Ref, data: Data) {
     this.writes.push({ ref, kind: "update", data: clone(data) });
+  }
+  delete(ref: Ref) {
+    this.writes.push({ ref, kind: "delete", data: {} });
   }
 
   /** Returns false when a document read by this transaction changed meanwhile. */
@@ -158,6 +173,10 @@ class Tx {
     for (const w of this.writes) {
       const c = store.col(w.ref.col);
       const prev = c.get(w.ref.id);
+      if (w.kind === "delete") {
+        c.delete(w.ref.id);
+        continue;
+      }
       const data = w.kind === "update" || (w.kind === "set" && w.merge) ? { ...(prev?.data ?? {}), ...w.data } : w.data;
       c.set(w.ref.id, { data, version: (prev?.version ?? 0) + 1 });
     }

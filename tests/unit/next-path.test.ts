@@ -6,6 +6,8 @@ describe("safeNext", () => {
     expect(safeNext("/concerts/abc123")).toBe("/concerts/abc123");
     expect(safeNext("/concerts/abc123?buy=1")).toBe("/concerts/abc123?buy=1");
     expect(safeNext("/orders/abc_def")).toBe("/orders/abc_def");
+    expect(safeNext("/tickets")).toBe("/tickets");
+    expect(safeNext("/profile")).toBe("/profile");
   });
   it("rejects external and malformed targets", () => {
     for (const v of ["https://evil.example", "//evil.example", "/dashboard", "/concerts/../admin", "/concerts/a?x=1", "javascript:alert(1)", "", undefined, null, ["/concerts/a"]]) {

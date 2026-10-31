@@ -1,5 +1,5 @@
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { Timestamp } from "firebase-admin/firestore";
 import { ApiError } from "@/lib/shared/errors";
 import { concertPhase } from "@/lib/shared/concerts";
@@ -13,6 +13,9 @@ import { rateLimit } from "./ratelimit";
 import { COLLECTIONS, SCHEMA_VERSION, type OrderDoc, type StreamDoc, type UserDoc } from "./schema";
 
 const MAX_CLAIMS = 5;
+/** A pending payment younger than this is reused on a repeated click instead of creating a second one. */
+const PENDING_REUSE_MS = 10 * 60_000;
+const RECOVERY_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
 const orderRef = (id: string) => db.collection(COLLECTIONS.orders).doc(id);
 export const orderIdFor = (concertId: string, buyerUid: string) => `${concertId}_${buyerUid}`;
@@ -76,6 +79,10 @@ export async function startCheckout(acc: AccountContext, concertId: string, requ
 
   const existing = (await orderRef(orderId).get()).data() as OrderDoc | undefined;
   if (existing?.status === "PAID") return { orderId, redirectUrl: `/orders/${orderId}` };
+  // Double click / reload: the same pending order keeps its payment session. The price is re-read from the concert every time.
+  if (existing?.status === "PENDING" && existing.paymentUrl && existing.amountKgs === price && Date.now() - existing.updatedAt.toMillis() < PENDING_REUSE_MS) {
+    return { orderId, redirectUrl: existing.paymentUrl };
+  }
 
   // Resolve the provider before writing anything, so an unconfigured provider leaves no orphan order.
   const provider = price > 0 ? paymentProvider() : null;
@@ -94,6 +101,8 @@ export async function startCheckout(acc: AccountContext, concertId: string, requ
     paidAt: null,
     linkId: existing?.linkId ?? null,
     claims: existing?.claims ?? 0,
+    paymentUrl: null,
+    recoveryHash: existing?.recoveryHash ?? null,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -104,7 +113,7 @@ export async function startCheckout(acc: AccountContext, concertId: string, requ
     return { orderId, redirectUrl: `/orders/${orderId}?fresh=1` };
   }
   const session = await provider.createPayment({ orderId, paymentId, returnUrl: `${appOrigin()}/orders/${orderId}`, amountKgs: price, description: stream.title });
-  await orderRef(orderId).update({ providerRef: session.providerRef, updatedAt: Timestamp.now() });
+  await orderRef(orderId).update({ providerRef: session.providerRef, paymentUrl: session.url, updatedAt: Timestamp.now() });
   return { orderId, redirectUrl: session.url };
 }
 
@@ -115,15 +124,56 @@ export async function findOrderByPaymentId(paymentId: string): Promise<{ id: str
   return d ? { id: d.id, order: d.data() as OrderDoc } : null;
 }
 
-/** Id of the buyer paid order for this concert, or null: the concert page then offers to watch instead of pay. */
-export async function paidOrderId(buyerUid: string, concertId: string): Promise<string | null> {
+/** The buyer order for a concert (any status), or null: the concert page then offers to watch, wait or pay. */
+export async function orderStateFor(buyerUid: string, concertId: string): Promise<{ id: string; status: OrderDoc["status"] } | null> {
   const id = orderIdFor(concertId, buyerUid);
   const o = (await orderRef(id).get()).data() as OrderDoc | undefined;
-  return o?.status === "PAID" ? id : null;
+  return o ? { id, status: o.status } : null;
+}
+
+/** concertId -> order status for one buyer (catalog cards show Watch / Awaiting payment from it). */
+export async function ticketStatusMap(buyerUid: string): Promise<Record<string, OrderDoc["status"]>> {
+  const snap = await db.collection(COLLECTIONS.orders).where("buyerUid", "==", buyerUid).limit(200).get();
+  const out: Record<string, OrderDoc["status"]> = {};
+  for (const d of snap.docs) {
+    const o = d.data() as OrderDoc;
+    if (out[o.concertId] !== "PAID") out[o.concertId] = o.status;
+  }
+  return out;
+}
+
+/** The buyer own tickets with just enough concert data to render them. Nothing about other buyers. */
+export async function listMyTickets(buyerUid: string) {
+  const snap = await db.collection(COLLECTIONS.orders).where("buyerUid", "==", buyerUid).limit(100).get();
+  const now = Date.now();
+  const rows = await Promise.all(
+    snap.docs.map(async (d) => {
+      const o = d.data() as OrderDoc;
+      if (o.status === "FAILED") return null;
+      const s = (await db.collection(COLLECTIONS.streams).doc(o.concertId).get()).data() as StreamDoc | undefined;
+      if (!s) return null;
+      const startsMs = (s.startsAt ?? s.accessStartsAt).toMillis();
+      const endsMs = (s.endsAt ?? s.accessEndsAt).toMillis();
+      return {
+        orderId: d.id,
+        concertId: o.concertId,
+        status: o.status,
+        title: s.title,
+        // The public cover route serves published concerts only.
+        coverUrl: s.publicationStatus === "published" && s.coverPath && s.coverUpdatedAt ? `/api/v1/catalog/${o.concertId}/cover?v=${s.coverUpdatedAt.toMillis()}` : null,
+        startsAt: new Date(startsMs).toISOString(),
+        endsAt: new Date(endsMs).toISOString(),
+        phase: concertPhase(now, startsMs, endsMs),
+        withdrawn: s.publicationStatus !== "published",
+        paidAtMs: o.paidAt?.toMillis() ?? o.createdAt.toMillis(),
+      };
+    }),
+  );
+  return rows.filter((r): r is NonNullable<typeof r> => r !== null).sort((a, b) => b.paidAtMs - a.paidAtMs);
 }
 
 export async function getOrder(acc: AccountContext, id: string) {
-  return orderDto(id, await ownOrder(acc, id));
+  return { ...orderDto(id, await ownOrder(acc, id)), guest: acc.user.guest === true };
 }
 
 /** Mock provider only: the buyer "pays" on our test page. */
@@ -155,7 +205,7 @@ export async function claimAccess(acc: AccountContext, id: string, requestId: st
     idempotencyKey: claimKey(id, o.claims),
     route: `orders/${id}/access`,
     ...(replacing ? { replaceLinkId: o.linkId! } : { streamId: o.concertId }),
-    label: `Билет ${acc.user.authEmail}`.slice(0, 80),
+    label: `Билет ${acc.user.authEmail || `гость ${acc.actor.uid.slice(0, 6)}`}`.slice(0, 80),
     expiresAt: stream.accessEndsAt.toDate(),
     reason: replacing ? "ticket re-issued" : undefined,
     requestId,
@@ -165,4 +215,51 @@ export async function claimAccess(acc: AccountContext, id: string, requestId: st
   if (!r.replayed) await orderRef(id).update({ linkId: r.linkId, claims: o.claims + 1, updatedAt: Timestamp.now() });
   else if (o.claims === 0) await orderRef(id).update({ linkId: r.linkId, claims: 1, updatedAt: Timestamp.now() });
   return { url: r.url };
+}
+
+const hashCode = (code: string) => createHash("sha256").update(code).digest("hex");
+const normalizeCode = (raw: string) => raw.toUpperCase().replace(/[^A-Z2-9]/g, "");
+
+/**
+ * Recovery code for a paid ticket: lets the buyer move it to a new session if the guest session is lost
+ * (cleared browser data). Shown once; only its hash is stored, and a new code replaces the old one.
+ */
+export async function createRecoveryCode(acc: AccountContext, id: string): Promise<{ code: string }> {
+  const o = await ownOrder(acc, id);
+  if (o.status !== "PAID") throw new ApiError("FORBIDDEN", "Заказ не оплачен");
+  const raw = Array.from(randomBytes(16), (b) => RECOVERY_ALPHABET[b % 32]).join("");
+  await orderRef(id).update({ recoveryHash: hashCode(raw), updatedAt: Timestamp.now() });
+  return { code: raw.match(/.{4}/g)!.join("-") };
+}
+
+/**
+ * Moves a paid ticket to the current session. The code is single-use: the order is re-created under the
+ * new buyer id (order ids embed the buyer), the old one is deleted. The issued access link keeps working.
+ */
+export async function recoverOrder(acc: AccountContext, rawCode: string, requestId: string): Promise<{ orderId: string }> {
+  await rateLimit(`recover:${acc.actor.uid}`, 8, 600);
+  const code = normalizeCode(rawCode);
+  if (code.length !== 16) throw new ApiError("VALIDATION_ERROR", "Некорректный код");
+  const snap = await db.collection(COLLECTIONS.orders).where("recoveryHash", "==", hashCode(code)).limit(1).get();
+  const found = snap.docs[0];
+  if (!found) throw new ApiError("NOT_FOUND", "Код не найден или уже использован");
+
+  return db.runTransaction(async (tx) => {
+    const oldRef = found.ref;
+    const old = (await tx.get(oldRef)).data() as OrderDoc | undefined;
+    if (!old || old.status !== "PAID" || old.recoveryHash !== hashCode(code)) throw new ApiError("NOT_FOUND", "Код не найден или уже использован");
+    const newId = orderIdFor(old.concertId, acc.actor.uid);
+    if (newId === oldRef.id) return { orderId: newId };
+    const newRef = orderRef(newId);
+    if ((await tx.get(newRef)).exists) throw new ApiError("IDEMPOTENCY_CONFLICT", "На этом аккаунте уже есть билет на этот концерт");
+    const now = Timestamp.now();
+    tx.create(newRef, { ...old, buyerUid: acc.actor.uid, recoveryHash: null, paymentUrl: null, updatedAt: now });
+    tx.delete(oldRef);
+    auditCreate(
+      tx,
+      { eventId: randomUUID(), actorUid: acc.actor.uid, actorType: acc.user.guest ? "GUEST" : "USER", action: "ORDER_RECOVERED", targetType: "order", targetId: newId, requestId, before: { buyerUid: old.buyerUid }, after: { concertId: old.concertId } },
+      now,
+    );
+    return { orderId: newId };
+  });
 }

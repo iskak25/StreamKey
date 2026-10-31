@@ -1,17 +1,16 @@
 import Image from "next/image";
 
-const RATIO = 724 / 2172;
+// logo-neon.png: transparent neon logo (720x176), made for the dark theme.
+const RATIO = 176 / 720;
 
-export default function Logo({ width = 180, plate = false }: { width?: number; plate?: boolean }) {
-  const img = (
+export default function Logo({ width = 180, priority = true }: { width?: number; priority?: boolean }) {
+  return (
     <Image
-      src="/logo.png"
+      src="/logo-neon.png"
       alt="StreamKey — один ключ, один зритель"
       width={width}
       height={Math.round(width * RATIO)}
-      priority
+      priority={priority}
     />
   );
-  // The artwork has a white background and dark lettering: on dark pages it sits on a light plate.
-  return plate ? <div className="logo-plate">{img}</div> : img;
 }

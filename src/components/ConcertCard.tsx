@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { formatBishkek, formatPrice, PHASE_LABEL, type ConcertPhase } from "@/lib/shared/concerts";
+import { formatBishkekShort, formatPrice, type ConcertPhase } from "@/lib/shared/concerts";
+import ConcertAdminTools from "./ConcertAdminTools";
+import ConcertStatusBadge from "./ConcertStatusBadge";
+import { NoteIcon } from "./icons";
 
 export interface ConcertCardData {
   id: string;
@@ -8,49 +11,99 @@ export interface ConcertCardData {
   coverUrl: string | null;
   priceKgs: number;
   startsAt: string;
+  endsAt?: string;
   phase: ConcertPhase;
 }
 
-const PHASE_CLASS: Record<ConcertPhase, string> = { soon: "pill pill-warn", live: "pill pill-ok", ended: "pill" };
+/** What the signed-in viewer already has for this concert. */
+export type TicketState = "paid" | "pending" | null;
 
-/** Presentational only (used by the public catalog and by the admin wizard preview). */
-export default function ConcertCard({ concert, href, editHref = null }: { concert: ConcertCardData; href: string | null; editHref?: string | null }) {
+/** The one verb a card offers; ended concerts offer none (no recording is sold). */
+export function cardAction(phase: ConcertPhase, ticket: TicketState): string | null {
+  if (phase === "ended") return null;
+  if (ticket === "paid") return phase === "live" ? "Смотреть" : "Билет куплен";
+  if (ticket === "pending") return "Ожидаем оплату";
+  return "Купить билет";
+}
+
+/**
+ * Poster card (4:5) used by the catalog and the admin preview; "compact" is the horizontal form.
+ * The whole card is one link (stretched title link); admin shortcuts sit above it.
+ * Presentational: it never fetches anything.
+ */
+export default function ConcertCard({
+  concert,
+  href,
+  ticket = null,
+  adminTools = false,
+  variant = "standard",
+  eager = false,
+}: {
+  concert: ConcertCardData;
+  href: string | null;
+  ticket?: TicketState;
+  adminTools?: boolean;
+  variant?: "standard" | "compact";
+  /** First-screen cards load immediately, the rest lazily. */
+  eager?: boolean;
+}) {
+  const title = concert.title || "Название концерта";
+  const action = cardAction(concert.phase, ticket);
+  const titleNode = href ? (
+    <Link className="card-link" href={href}>
+      {title}
+    </Link>
+  ) : (
+    title
+  );
+  const price = ticket === "paid" ? <span className="pill pill-ok">Билет куплен</span> : <span className="concert-price">{formatPrice(concert.priceKgs)}</span>;
+  const cover = concert.coverUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={concert.coverUrl} alt="" width={400} height={500} loading={eager ? "eager" : "lazy"} decoding="async" />
+  ) : (
+    <div className="concert-cover-empty" aria-hidden="true">
+      <NoteIcon size={40} />
+    </div>
+  );
+
+  if (variant === "compact") {
+    return (
+      <article className="concert-row">
+        <div className="thumb">{cover}</div>
+        <div className="info">
+          <ConcertStatusBadge phase={concert.phase} />
+          <h3 className="concert-title">{titleNode}</h3>
+          <p className="concert-meta">{formatBishkekShort(concert.startsAt)}</p>
+          <div className="actions">
+            {price}
+            {action && <span className="concert-action">{action}</span>}
+          </div>
+        </div>
+      </article>
+    );
+  }
+
   return (
     <article className="concert-card">
-      {editHref && (
-        <Link className="concert-edit" href={editHref} aria-label="Редактировать концерт" title="Редактировать">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M12 20h9" />
-            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-          </svg>
-        </Link>
-      )}
+      {adminTools && <ConcertAdminTools concertId={concert.id} />}
       <div className="concert-cover">
-        {concert.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={concert.coverUrl} alt="" loading="lazy" />
-        ) : (
-          <div className="concert-cover-empty" aria-hidden="true">
-            ♪
-          </div>
-        )}
+        {cover}
+        <ConcertStatusBadge phase={concert.phase} />
       </div>
       <div className="concert-body">
-        <span className={PHASE_CLASS[concert.phase]}>{PHASE_LABEL[concert.phase]}</span>
-        <h2>{concert.title || "Название концерта"}</h2>
-        {concert.description && <p className="muted">{concert.description}</p>}
-        <p className="concert-meta">{formatBishkek(concert.startsAt)}</p>
-        <p className="concert-price">{formatPrice(concert.priceKgs)}</p>
-        {href ? (
-          <Link className="btn btn-brand link-reset" role="button" href={href}>
-            Подробнее
-          </Link>
-        ) : (
-          <span className="btn btn-brand" aria-disabled="true">
-            Подробнее
-          </span>
-        )}
+        <h2 className="concert-title">{titleNode}</h2>
+        <p className="concert-meta">{formatBishkekShort(concert.startsAt)}</p>
+        {concert.description && <p className="concert-desc">{concert.description}</p>}
+        <div className="concert-foot">
+          {price}
+          {action && <span className="concert-action">{action} →</span>}
+        </div>
       </div>
     </article>
   );
+}
+
+/** Order status (as stored) to what a card shows. */
+export function ticketState(status: "PENDING" | "PAID" | "FAILED" | undefined | null): TicketState {
+  return status === "PAID" ? "paid" : status === "PENDING" ? "pending" : null;
 }

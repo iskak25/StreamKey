@@ -239,7 +239,7 @@ export default function ConcertWizard({ concertId }: { concertId?: string }) {
           <div className="field">
             <label htmlFor="cover">Обложка (JPEG, PNG или WebP)</label>
             <input id="cover" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => void pickCover(e.target.files?.[0])} />
-            <span className="hint">Картинка автоматически уменьшается до 1280 px и сжимается до 280 КБ. Лучше всего подходит формат 16:9.</span>
+            <span className="hint">Картинка автоматически уменьшается до 1280 px и сжимается до 280 КБ. Лучше всего подходит вертикальный постер 4:5: на карточках он показывается именно так.</span>
             {coverError && (
               <p className="notice notice-error" role="alert">
                 {coverError}

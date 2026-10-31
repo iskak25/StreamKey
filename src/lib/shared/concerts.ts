@@ -38,6 +38,10 @@ const bishkekFmt = new Intl.DateTimeFormat("ru-RU", {
 });
 export const formatBishkek = (iso: string | null | undefined): string => (iso ? `${bishkekFmt.format(new Date(iso))} (Бишкек)` : "—");
 
+const bishkekShortFmt = new Intl.DateTimeFormat("ru-RU", { timeZone: BISHKEK_TZ, day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+/** Card form: "31 окт., 08:00" (Bishkek). */
+export const formatBishkekShort = (iso: string | null | undefined): string => (iso ? bishkekShortFmt.format(new Date(iso)) : "—");
+
 export function formatPrice(priceKgs: number): string {
   return priceKgs === 0 ? "Бесплатно" : `${new Intl.NumberFormat("ru-RU").format(priceKgs)} сом`;
 }

@@ -45,10 +45,15 @@ export const ACTIVE_STREAM_STATUSES = ["DRAFT", "SCHEDULED", "LIVE"] as const;
 export const UserDoc = z.object({
   ...base,
   uid: z.string().min(1),
-  authEmail: z.string().email(),
+  /** Empty for a guest (anonymous Firebase session). */
+  authEmail: z.string().email().or(z.literal("")),
+  /** True while the account is an anonymous guest viewer; cleared when the guest links Google. */
+  guest: z.boolean().optional(),
   emailVerified: z.boolean(),
   googleProviderUid: z.string(),
   googleDisplayName: z.string().nullable(),
+  /** Google profile picture (https, googleusercontent.com only); null when the account has none. */
+  photoUrl: z.string().max(500).nullable().optional(),
   displayName: z.string().max(120),
   contactEmail: z.string().email().nullable(),
   role: Role,
@@ -224,6 +229,10 @@ export interface OrderDoc {
   /** Current access link issued for this ticket, and how many times a link was issued. */
   linkId: string | null;
   claims: number;
+  /** sha256 of the ticket recovery code (the code itself is shown once and never stored). */
+  recoveryHash?: string | null;
+  /** Provider payment page of the current pending attempt; reused on a repeated click. Visible to the buyer only. */
+  paymentUrl?: string | null;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }

@@ -15,6 +15,9 @@ export function proxy(request: NextRequest) {
   const authConnect = isLogin
     ? ["https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://www.googleapis.com"]
     : [];
+  // Guests buy without Google: an anonymous Firebase session needs only the token endpoints, no frames or scripts.
+  const guestAuth = request.nextUrl.pathname.startsWith("/concerts/") || request.nextUrl.pathname === "/recover";
+  const guestConnect = guestAuth && !isLogin ? ["https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com"] : [];
   const authScripts = isLogin ? ["https://apis.google.com"] : [];
   // Google's sign-in helper injects an inline style (reported by the browser with this exact hash). Allowed by hash, not by
   // 'unsafe-inline', and style ATTRIBUTES (its hidden iframe) are allowed on the login page only.
@@ -26,9 +29,9 @@ export function proxy(request: NextRequest) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://www.youtube.com ${authScripts.join(" ")}${isDev ? " 'unsafe-eval'" : ""}`,
     `style-src 'self' 'nonce-${nonce}'${isLogin ? ` ${loginStyleHash}` : ""}`,
     ...(isLogin ? ["style-src-attr 'unsafe-inline'"] : []),
-    "img-src 'self' data: https://i.ytimg.com",
+    "img-src 'self' data: https://i.ytimg.com https://*.googleusercontent.com",
     `frame-src https://www.youtube.com https://www.youtube-nocookie.com ${authFrames.join(" ")}`,
-    `connect-src 'self' ${authConnect.join(" ")}`,
+    `connect-src 'self' ${authConnect.join(" ")} ${guestConnect.join(" ")}`,
     "font-src 'self'",
     "object-src 'none'",
     "base-uri 'self'",
